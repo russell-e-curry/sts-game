@@ -1,0 +1,56 @@
+.objective-card {
+  position: relative;
+  height: 47%;
+  width: auto;
+  aspect-ratio: 5 / 7;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(122, 31, 214, 0.3), rgba(20, 21, 31, 0.85));
+  border: 1px solid var(--border-accent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 0 20px rgba(122, 31, 214, 0.3);
+}
+
+.objective-card-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.objective-card-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+}
+
+.objective-card-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.objective-card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.objective-card-description {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.7);
+}

@@ -1,0 +1,8 @@
+{
+  "title": "Add Unit Tests",
+  "type": "coding",
+  "action": "recurring",
+  "description": "The PM needs 90% coverage by the end of the quarter, you need a new job.",
+  "backlog": 10,
+  "burnout": 10
+}

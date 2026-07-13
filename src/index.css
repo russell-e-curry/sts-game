@@ -1,8 +1,10 @@
 :root {
   --text: #6b6375;
   --text-h: #08060d;
+  --text-muted: #9b95a3;
   --bg: #fff;
   --border: #e5e4e7;
+  --border-strong: #cac8ce;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
   --accent-bg: rgba(170, 59, 255, 0.1);
@@ -10,6 +12,17 @@
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --surface-0: #faf9f6;
+  --surface-1: #f1f0ec;
+  --surface-2: #ffffff;
+  --text-accent: #7a1fd6;
+  --text-success: #0f6e56;
+  --text-danger: #a32d2d;
+  --bg-danger: rgba(226, 75, 74, 0.12);
+  --bg-success: rgba(29, 158, 117, 0.12);
+  --border-danger: rgba(226, 75, 74, 0.4);
+  --border-accent: rgba(170, 59, 255, 0.4);
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -34,8 +47,10 @@
   :root {
     --text: #9ca3af;
     --text-h: #f3f4f6;
+    --text-muted: #6b7280;
     --bg: #16171d;
     --border: #2e303a;
+    --border-strong: #3d4049;
     --code-bg: #1f2028;
     --accent: #c084fc;
     --accent-bg: rgba(192, 132, 252, 0.15);
@@ -43,6 +58,17 @@
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+    --surface-0: #16171d;
+    --surface-1: #1f2028;
+    --surface-2: #23242c;
+    --text-accent: #c084fc;
+    --text-success: #5dcaa5;
+    --text-danger: #f09595;
+    --bg-danger: rgba(226, 75, 74, 0.15);
+    --bg-success: rgba(29, 158, 117, 0.18);
+    --border-danger: rgba(226, 75, 74, 0.4);
+    --border-accent: rgba(192, 132, 252, 0.4);
   }
 
   #social .button-icon {
@@ -50,20 +76,23 @@
   }
 }
 
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
+  width: 100%;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-}
-
-body {
-  margin: 0;
+  background:
+    radial-gradient(ellipse at top, rgba(122, 31, 214, 0.25), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(226, 75, 74, 0.15), transparent 60%),
+    #0d0e13;
 }
 
 h1,

@@ -1,0 +1,8 @@
+{
+  "title": "Consultants Ahoy!",
+  "type": "coding",
+  "action": "recurring",
+  "description": "Your boss hires a software consulting firm, they'll get fat stacks, you'll get more meetings",
+  "backlog": 15,
+  "burnout": 10
+}

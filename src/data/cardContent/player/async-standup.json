@@ -1,0 +1,8 @@
+{
+  "title": "Async Standup",
+  "type": "meeting",
+  "action": "one time",
+  "description": "Draw 1 card.",
+  "backlog": 30,
+  "burnout": -5
+}

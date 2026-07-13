@@ -1,0 +1,7 @@
+{
+  "title": "Meet with PM",
+  "type": "coding",
+  "action": "one time",
+  "description": "Meet with the product manager, renegotiate this quarter's deliverables",
+  "backlog": -100
+}

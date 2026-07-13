@@ -1,0 +1,165 @@
+.game-board {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+  gap: 8px;
+  padding: 12px;
+}
+
+/* The manager area and the player's hand area each take a quarter of the available
+   height, and the battle area takes the remaining half, staying that way as the
+   window resizes. */
+.top-bar,
+.bottom-bar {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.battle-row {
+  flex: 2 1 0;
+  min-height: 0;
+}
+
+.top-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.top-bar-manager {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bottom-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.side-label {
+  flex-shrink: 0;
+  margin: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Fills the third that's left under the label; its card rows size themselves to this
+   height (see Hand.css / ManagerHand.css / Deck.css). */
+.side-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Passthrough wrapper (holds the ref used to place the flight animation) — must carry
+   the row height down to the manager hand so its cards scale like the player's. */
+.manager-hand-wrap {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Same passthrough purpose as .manager-hand-wrap, for the player's hand (holds the
+   ref used to locate a specific empty slot when a drawn card flies into it). */
+.hand-wrap {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Passthrough wrapper around a Deck (holds the ref used as the flight animation's
+   source rect when a replacement card is drawn) — shared by the player's and the
+   manager's deck. */
+.deck-wrap {
+  flex: 0 0 auto;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Mirrors .top-bar-manager's column structure (invisible label + content row) so
+   .hud-panel — and the bars inside it — end up exactly as tall as the manager's card
+   row, not the whole column (which would also include the label's height). */
+.hud {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.hud-spacer {
+  visibility: hidden;
+}
+
+.hud-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, rgba(122, 31, 214, 0.25), rgba(20, 21, 31, 0.6));
+  border: 1px solid var(--border-accent);
+  border-radius: 16px;
+  padding: 10px 20px;
+  box-shadow: 0 0 24px rgba(122, 31, 214, 0.25);
+}
+
+.battle-row {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+}
+
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.drag-ghost .game-card {
+  width: 100%;
+  height: 100%;
+}
+
+/* Shared by the manager's opening-play animation and the player's card-draw
+   animation — both fly a face-down card from a fixed origin to a destination rect,
+   then flip it over in place (see .flip-card in BattleArea.css). */
+.card-flight {
+  position: fixed;
+  pointer-events: none;
+  z-index: 900;
+  transition: top 0.45s ease, left 0.45s ease, width 0.45s ease, height 0.45s ease;
+}
+
+.card-flight .game-card {
+  width: 100%;
+  height: 100%;
+}
+
+/* Used by the manager's hand-refill animation, which — unlike the other flights —
+   never flips: the replacement card stays face-down the whole trip, so it's just a
+   plain back image rather than a .flip-card. */
+.card-flight-back {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}

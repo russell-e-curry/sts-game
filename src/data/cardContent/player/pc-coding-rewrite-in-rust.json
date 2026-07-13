@@ -1,0 +1,9 @@
+{
+  "title": "Rewrite in Rust",
+  "type": "coding",
+  "action": "one time",
+  "description": "It won't do shit, but at least you'll make the front page of Hacker News",
+  "backlog": 150,
+  "technicalDebt": 50,
+  "burnout": 20
+}

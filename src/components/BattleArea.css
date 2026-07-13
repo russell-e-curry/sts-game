@@ -1,0 +1,202 @@
+.battle-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 2px dashed rgba(170, 59, 255, 0.4);
+  border-radius: 16px;
+  background: radial-gradient(ellipse at center, rgba(122, 31, 214, 0.18), transparent 70%);
+  overflow: hidden;
+}
+
+.battle-area:has(.game-card-hovered) {
+  overflow: visible;
+}
+
+.history-row {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 50%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 8px 20px 24px;
+  box-sizing: border-box;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.history-track {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+/* Sits in the gutter opened up by .history-row's extra bottom padding, spanning the
+   same horizontal extent as the played-card columns above it. Always mounted (rather
+   than conditionally rendered) so it can be measured to detect overflow in the first
+   place; faded out via opacity/pointer-events when there's nothing to scroll. */
+.history-scrollbar {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 6px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.history-scrollbar-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Inverted from a typical scrollbar: resting (untouched) sits flush right, since that's
+   where the newest/default view lives — dragging it left is what uncovers earlier
+   rounds clipped off the row's left edge. */
+.history-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+  box-shadow: 0 0 8px rgba(170, 59, 255, 0.6);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.history-scrollbar-thumb:active {
+  cursor: grabbing;
+}
+
+/* A hovered card lifts into a fixed overlay, but .history-row (z-index: 1) and
+   .active-column (z-index: 2) are stacking contexts that would otherwise trap that
+   overlay beneath its siblings — including the hand cards (z-index: 50). Raise the
+   whole row/column above everything persistent (drag ghost/flight stay higher) so the
+   hovered card is on top of the entire board. */
+.history-row:has(.game-card-hovered) {
+  overflow: visible;
+  z-index: 500;
+}
+
+.battle-column-history {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  animation: history-enter 0.4s ease;
+}
+
+.battle-column-history:has(.game-card-hovered) {
+  z-index: 60;
+}
+
+@keyframes history-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Spans the full width with its slots centered (align-items) instead of being a
+   narrow column centered via transform: translateX(-50%). A transform here would make
+   the hovered card's position: fixed overlay resolve against this element rather than
+   the viewport, throwing it off-screen. pointer-events lets the empty gutter fall
+   through to the history cards underneath. */
+.active-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 0 24px;
+  box-sizing: border-box;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.active-column .battle-slot {
+  pointer-events: auto;
+}
+
+.active-column:has(.game-card-hovered) {
+  z-index: 500;
+}
+
+.battle-slot {
+  position: relative;
+  height: 47%;
+  aspect-ratio: 5 / 7;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.battle-slot .game-card {
+  width: 100%;
+  height: 100%;
+}
+
+.battle-slot-placeholder {
+  width: 100%;
+  height: 100%;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+}
+
+.flip-card {
+  width: 100%;
+  height: 100%;
+  perspective: 800px;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.55s ease;
+  transform-style: preserve-3d;
+}
+
+.flip-card-flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.flip-face-front img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.flip-face-back {
+  transform: rotateY(180deg);
+}

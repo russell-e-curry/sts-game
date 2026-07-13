@@ -1,0 +1,102 @@
+.sparkle-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sparkle-flash {
+  position: absolute;
+  inset: -16%;
+  border-radius: 16px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(170, 59, 255, 0.5) 45%, transparent 72%);
+  opacity: 0;
+  animation: sparkle-flash 0.9s ease-out;
+}
+
+.sparkle-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  animation: sparkle-dot 1s ease-out forwards;
+}
+
+.sparkle-dot-1 {
+  top: 6%;
+  left: 10%;
+  --dx: -18px;
+  --dy: -14px;
+  animation-delay: 0s;
+}
+
+.sparkle-dot-2 {
+  top: 12%;
+  right: 8%;
+  --dx: 20px;
+  --dy: -10px;
+  animation-delay: 0.06s;
+}
+
+.sparkle-dot-3 {
+  top: 45%;
+  left: -4%;
+  --dx: -22px;
+  --dy: 6px;
+  animation-delay: 0.12s;
+}
+
+.sparkle-dot-4 {
+  top: 45%;
+  right: -4%;
+  --dx: 22px;
+  --dy: 6px;
+  animation-delay: 0.05s;
+}
+
+.sparkle-dot-5 {
+  bottom: 8%;
+  left: 14%;
+  --dx: -16px;
+  --dy: 16px;
+  animation-delay: 0.15s;
+}
+
+.sparkle-dot-6 {
+  bottom: 8%;
+  right: 12%;
+  --dx: 18px;
+  --dy: 14px;
+  animation-delay: 0.1s;
+}
+
+@keyframes sparkle-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.75);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes sparkle-dot {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(1);
+  }
+}

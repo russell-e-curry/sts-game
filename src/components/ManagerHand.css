@@ -1,0 +1,42 @@
+.manager-hand {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Matches the player hand: height is the fixed dimension (100% of the row, always
+   definite from the flex layout above) and width is derived from it via aspect-ratio,
+   capped at an ideal viewport-relative width. Deriving width FROM height guarantees
+   the card is always exactly as tall as its row and keeps 5:7 proportions intact. */
+.manager-hand-slot {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 100%;
+  max-width: 12vw;
+  aspect-ratio: 5 / 7;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+}
+
+.manager-hand-card {
+  width: 90%;
+  height: 90%;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.manager-hand-card-hidden {
+  opacity: 0;
+}

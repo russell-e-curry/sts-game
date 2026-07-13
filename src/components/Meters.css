@@ -1,0 +1,72 @@
+.meters {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  width: 480px;
+  box-sizing: border-box;
+}
+
+.meter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meter-bar-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.meter-bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meter-bar-track {
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.meter-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.meter-bar-fill-backlog {
+  background: linear-gradient(90deg, #2f8fff, #1a5fd6);
+  box-shadow: 0 0 8px rgba(47, 143, 255, 0.6);
+}
+
+.meter-bar-fill-techdebt {
+  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+  box-shadow: 0 0 8px rgba(170, 59, 255, 0.6);
+}
+
+.meter-bar-fill-burnout {
+  background: linear-gradient(90deg, #ff6b5b, #c81e1e);
+  box-shadow: 0 0 8px rgba(200, 30, 30, 0.6);
+}
+
+.meter-bar-fill-vesting {
+  background: linear-gradient(90deg, #ffd76a, #d4a017);
+  box-shadow: 0 0 8px rgba(212, 160, 23, 0.6);
+}
+
+.meter-bar-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  text-align: right;
+}

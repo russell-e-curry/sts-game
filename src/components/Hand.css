@@ -1,0 +1,37 @@
+.hand {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+/* Height is the fixed dimension (100% of the row, which is always a definite size
+   from the flex layout above) and width is derived from it via aspect-ratio, capped
+   at an ideal viewport-relative width so slots don't get absurdly wide when there
+   are only a couple of cards. Deriving width FROM height (rather than the other way
+   around, with height merely capped) guarantees the card is always exactly as tall
+   as its row and keeps the 5:7 playing-card proportions intact. */
+.hand-slot {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 100%;
+  max-width: 12vw;
+  aspect-ratio: 5 / 7;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+}
+
+.hand-slot .game-card {
+  width: 90%;
+  height: 90%;
+}

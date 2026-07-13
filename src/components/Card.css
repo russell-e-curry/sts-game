@@ -1,0 +1,336 @@
+.game-card {
+  position: relative;
+  width: 150px;
+  height: 210px;
+  /* Fixed px, not cqw: an element can't resolve container query units against its
+     own size, so a cqw value here would fall back to resolving against the
+     viewport instead — producing a huge radius that rounds the card into an oval. */
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transform-origin: bottom center;
+  z-index: 1;
+  /* Every measurement inside .game-card-template is sized in cqw (percent of this
+     card's own width) instead of fixed px, so the template looks identical whether
+     the card is rendered at the hand's fixed 150px or the battle area's larger
+     fluid width — fixed-px chrome would eat a different percentage of each. */
+  container-type: inline-size;
+}
+
+/* Enlarged cards just get lifted + a heavier shadow; the actual growth happens by
+   re-laying-out at a fixed overlay size (set inline), not by a transform — a
+   transform would magnify the cramped resting layout (clipped text and all). */
+.game-card-hovered {
+  z-index: 50;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+}
+
+/* Every card enlarges to the same fixed overlay size (width/height set inline). The
+   body fills whatever space is left under the artwork and the description font is
+   auto-scaled in JS to fit it, so no card's rules text clips at the bottom. */
+.game-card-overlay .game-card-body {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+/* Give the description a generous, readable share of the enlarged card: tighten the
+   inter-row gaps and shrink the artwork from its resting proportion so the text area
+   below it isn't starved (which would force the auto-fit to tiny, unreadable sizes). */
+.game-card-overlay .game-card-template {
+  gap: 2cqw;
+}
+
+/* Square frame in the enlarged view: the artwork is square, so a square frame lets it
+   fill the full card width AND show the whole image with no cropping or side letterbox
+   (object-fit: cover inherited from the base rule fills a square image edge-to-edge). */
+.game-card-overlay .game-card-art-frame {
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+.game-card-dimmed {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.game-card:active {
+  cursor: grabbing;
+}
+
+/* Recurring cards breathe: the whole card dims and brightens in place, rather than
+   any kind of border/edge glow. */
+.game-card-recurring {
+  animation: recurring-glow 3.5s ease-in-out infinite;
+}
+
+@keyframes recurring-glow {
+  0%,
+  100% {
+    filter: brightness(0.6);
+  }
+  50% {
+    filter: brightness(1.4);
+  }
+}
+
+/* Covers the whole card (clipped to its rounded corners by .game-card's overflow:
+   hidden) once an eliminate card has stopped this recurring effect. pointer-events:
+   none lets hover-enlarge still reach the card underneath so its original text stays
+   readable. */
+.game-card-stopped-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.3),
+    rgba(0, 0, 0, 0.3) 10px,
+    rgba(255, 255, 255, 0.3) 10px,
+    rgba(255, 255, 255, 0.3) 20px
+  );
+}
+
+.game-card-stopped-label {
+  font-size: 14cqw;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.9);
+  transform: rotate(-8deg);
+}
+
+.game-card-template {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(160deg, #23242c, #16171d);
+  border: 1px solid var(--border-accent);
+  border-radius: 8cqw;
+  padding: 6.67cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 4cqw;
+  box-sizing: border-box;
+}
+
+/* Recurring cards get a light silver face instead of the usual dark one; the
+   text/body colors below flip to dark so they stay readable against it. */
+.game-card-template-recurring {
+  background: linear-gradient(160deg, #f2f3f5, #c7cbd1);
+}
+
+.game-card-template-recurring .game-card-type,
+.game-card-template-recurring .game-card-action,
+.game-card-template-recurring .game-card-name {
+  color: #000;
+}
+
+/* The description box picks up a lighter silver tint (rather than the dark box every
+   other card uses), so the text goes black instead of white to stay readable. */
+.game-card-template-recurring .game-card-body {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Eliminate-action cards get a dark maroon face instead of the default charcoal —
+   close enough to the default dark-card look that the base white/off-white text
+   colors still work unchanged, but tinted red to read as a warning. The bright red
+   badge (see .game-card-eliminate-badge) stays the one loud accent instead of
+   competing with a red face. */
+.game-card-template-eliminate {
+  background: linear-gradient(160deg, #3a0a0a, #160404);
+}
+
+/* Flat, saturated red (not the softer burnout gradient) so this reads as a distinct
+   warning rather than just another stat pill — deliberately the highest-contrast badge
+   on the card. */
+.game-card-eliminate-badge {
+  flex-shrink: 0;
+  padding: 2.67cqw 4cqw;
+  border-radius: 999px;
+  background: #b33939;
+  color: #fff;
+  font-size: 5.33cqw;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.27cqw;
+  box-shadow: 0 0 10px rgba(179, 57, 57, 0.8);
+}
+
+/* Same gold used for vesting stat pills elsewhere on the card, so "reset" reads as a
+   positive/beneficial action rather than a warning like the eliminate badge. */
+.game-card-reset-badge {
+  flex-shrink: 0;
+  padding: 2.67cqw 4cqw;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffd76a, #d4a017);
+  color: #23242c;
+  font-size: 5.33cqw;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.27cqw;
+  box-shadow: 0 0 10px rgba(212, 160, 23, 0.6);
+}
+
+.game-card-template-recurring .game-card-rules {
+  color: #1a1b20;
+}
+
+.game-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4cqw;
+}
+
+.game-card-type,
+.game-card-action {
+  font-size: 5.33cqw;
+  text-transform: uppercase;
+  letter-spacing: 0.27cqw;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-card-action {
+  text-align: right;
+}
+
+.game-card-name {
+  margin: 0;
+  font-size: 7.5cqw;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.game-card-art-frame {
+  /* Height is pinned in cqw (a fixed fraction of the card's own width) rather than
+     flex: 1, so it stays the SAME proportion of the card at every rendered size.
+     With flex: 1 the frame absorbed the card's text-layout variance — the type
+     label and stat pills wrap to an extra line at the narrow hand width, stealing
+     vertical space — which collapsed the art at 150px but not when the card is laid
+     out wider (e.g. the drag ghost), making the photo look cropped in the hand and
+     full while dragging. The text body below now flexes/clips instead. */
+  flex: 0 0 auto;
+  height: 49cqw;
+  min-height: 0;
+  border-radius: 5.33cqw;
+  overflow: hidden;
+}
+
+.game-card-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.game-card-art-placeholder {
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.04) 5.33cqw,
+    rgba(255, 255, 255, 0.08) 5.33cqw,
+    rgba(255, 255, 255, 0.08) 10.67cqw
+  );
+}
+
+.game-card-body {
+  /* Absorbs the leftover vertical space and clips its text, so the fixed-height art
+     frame above never gets squeezed. */
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 34.67cqw;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 5.33cqw;
+  padding: 4cqw 5.33cqw;
+  box-sizing: border-box;
+}
+
+.game-card-rules {
+  margin: 0;
+  font-size: 5.33cqw;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.35;
+}
+
+/* Fixed left/center/right slots so each stat always lands in the same spot on the
+   card regardless of which subset of backlog/vesting/burnout a given card defines —
+   grid placement (below) keys off each stat's own class rather than DOM order, so a
+   card missing e.g. backlog doesn't shift vesting/burnout out of their corners. */
+.game-card-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 4cqw;
+}
+
+.game-card-stat {
+  min-width: 0;
+  font-size: 5.33cqw;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2cqw 4cqw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Slot = where in the footer a stat sits (left/center/right corner), independent of
+   which stat is occupying it — backlog and technical debt share the left slot (see
+   Card.tsx, which renders at most one of them) but need different colors. */
+.game-card-stat-slot-left {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.game-card-stat-slot-center {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.game-card-stat-slot-right {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.game-card-stat-color-backlog {
+  background: linear-gradient(90deg, #2f8fff, #1a5fd6);
+  box-shadow: 0 0 10px rgba(47, 143, 255, 0.6);
+}
+
+.game-card-stat-color-techdebt {
+  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+  box-shadow: 0 0 10px rgba(170, 59, 255, 0.6);
+}
+
+.game-card-stat-color-vesting {
+  background: linear-gradient(90deg, #ffd76a, #d4a017);
+  box-shadow: 0 0 10px rgba(212, 160, 23, 0.6);
+  color: #23242c;
+}
+
+.game-card-stat-color-burnout {
+  /* Reserves room for a sign plus 3 digits (e.g. "+100"/"-100") so the badge doesn't
+     resize as its value changes. */
+  min-width: 4ch;
+  background: linear-gradient(90deg, #ff6b5b, #c81e1e);
+  box-shadow: 0 0 10px rgba(200, 30, 30, 0.6);
+}

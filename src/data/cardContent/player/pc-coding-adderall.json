@@ -1,0 +1,8 @@
+{
+  "title": "Hit the Adderall",
+  "type": "coding",
+  "action": "one time",
+  "description": "Better living through chemistry, you're getting shit done. At least that's what the voices tell you.",
+  "technicalDebt": -100,
+  "burnout": 20
+}

@@ -1,0 +1,7 @@
+{
+  "title": "Switch Teams",
+  "type": "coding",
+  "action": "reset",
+  "description": "New team, new stack, new Slack channels to leave on read. Nobody here has heard of your backlog, and you intend to keep it that way.",
+  "burnout": -100
+}

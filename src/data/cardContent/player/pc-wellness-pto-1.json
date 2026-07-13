@@ -1,0 +1,8 @@
+{
+  "title": "Extended PTO",
+  "type": "wellness",
+  "action": "one time",
+  "description": "Ah, a few days off in the great outdoors. Also, your dog brought you this bear.",
+  "burnout": -50,
+  "vesting": 5
+}
