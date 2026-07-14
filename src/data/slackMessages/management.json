@@ -35,5 +35,56 @@
     "text": "I know we said no new initiatives this quarter, but hear me out.",
     "backlog": 40,
     "techDebt": 20
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "CMO",
+        "text": "Hey team, I was chatting with an investor and he asked if our login page uses blockchain 👀"
+      },
+      {
+        "character": "VP",
+        "text": "Interesting. What would blockchain even do for a login page?"
+      },
+      {
+        "character": "CMO",
+        "text": "Does it matter? He said Web3 like four times and his fund is closing next month."
+      },
+      {
+        "character": "VP",
+        "text": "Say less. Let's get ahead of this. PM, can you scope it?"
+      },
+      {
+        "character": "PM",
+        "text": "Scope what exactly, adding blockchain to... authentication?"
+      },
+      {
+        "character": "CMO",
+        "text": "Just make it decentralized-sounding. Maybe a little globe icon that spins."
+      },
+      {
+        "character": "VP",
+        "text": "Love the globe. Very trustworthy. Ships trust."
+      },
+      {
+        "character": "PM",
+        "text": "To be clear, we currently use email and password. There is no chain to block."
+      },
+      {
+        "character": "CMO",
+        "text": "Then we invent one! Innovation is just marketing with extra steps."
+      },
+      {
+        "character": "VP",
+        "text": "PM I'm gonna need this by the investor call Thursday, can we make that happen?"
+      },
+      {
+        "character": "PM",
+        "text": "Sounds good, I'll get the team right on it!",
+        "backlog": 25,
+        "burnout": 10
+      }
+    ]
   }
 ]

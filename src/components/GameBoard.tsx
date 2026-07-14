@@ -10,6 +10,7 @@ import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
 import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
+import SplashScreen from './SplashScreen'
 import { allSlackItems, isSlackConversation, CHANNEL_ORDER } from '../data/slackChannels'
 import type { SlackMessageJson } from '../data/slackMessages/schema'
 import './GameBoard.css'
@@ -107,17 +108,21 @@ function GameBoard() {
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
   const [vesting, setVesting] = useState(0)
   const [roundKey, setRoundKey] = useState(0)
+  // Gates the round-start effect below so the manager doesn't play its opening card
+  // until the player has dismissed the splash screen.
+  const [gameStarted, setGameStarted] = useState(false)
 
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
-  // True while a picked conversation is playing itself out message-by-message — the
-  // round loop (and the player's ability to respond) is frozen until it's done.
-  const [conversationActive, setConversationActive] = useState(false)
   const slackMessageCounter = useRef(0)
   // Keys (see allSlackItems) of every message/conversation already posted this game,
   // so none of them repeat for the rest of the session.
   const usedSlackItems = useRef<Set<string>>(new Set())
   const conversationTimers = useRef<number[]>([])
+  // True while a picked conversation is still posting its messages out — read (not
+  // reacted to) each round to skip picking a new message/conversation until it's
+  // done, even though card play itself keeps going in the meantime.
+  const conversationInProgress = useRef(false)
 
   const [draggingCard, setDraggingCard] = useState<PlayerCard | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
@@ -273,13 +278,11 @@ function GameBoard() {
   }
 
   // Plays a conversation's messages out one at a time, 1-10s apart, applying each
-  // message's own stat deltas as it lands — the round loop only resumes (via
-  // roundKey) once every message in the conversation has posted, so the manager
-  // won't play its next card (and the player has nothing to respond to) until then.
+  // message's own stat deltas as it lands — runs independently of the round loop, so
+  // the manager and player keep playing cards against each other while it's going.
   const runConversation = (channel: string, messages: SlackMessageJson[], index: number) => {
     if (index >= messages.length) {
-      setConversationActive(false)
-      setRoundKey((k) => k + 1)
+      conversationInProgress.current = false
       return
     }
 
@@ -309,7 +312,7 @@ function GameBoard() {
   }, [])
 
   const handleDropCard = (cardId: string) => {
-    if (!activeManagerCard || activePlayerCard || conversationActive) return
+    if (!activeManagerCard || activePlayerCard) return
     const slotIndex = hand.findIndex((c) => c?.id === cardId)
     if (slotIndex === -1) return
     const card = hand[slotIndex]!
@@ -352,6 +355,8 @@ function GameBoard() {
   // The manager opens every round by playing a card into the top slot; the player
   // only gets to respond once it's landed (see handleDropCard).
   useEffect(() => {
+    if (!gameStarted) return
+
     timers.current.forEach((t) => clearTimeout(t))
     timers.current = []
     setFlight(null)
@@ -441,7 +446,7 @@ function GameBoard() {
       timers.current.forEach((t) => clearTimeout(t))
       timers.current = []
     }
-  }, [roundKey])
+  }, [roundKey, gameStarted])
 
   // Once the player responds to the manager's card, resolve the round after the
   // sparkle-burst animation plays out.
@@ -564,15 +569,17 @@ function GameBoard() {
       // posts to its channel and nudges the meters same as a played card would. A
       // conversation's deltas are applied message-by-message as it plays out instead
       // of all at once here (see runConversation), so it's excluded below when picked.
+      // While a previously picked conversation is still posting, skip picking anything
+      // new this round — it resumes picking once that conversation finishes.
       let immediateMessage: SlackMessageJson | null = null
       let startedConversation: { channel: string; messages: SlackMessageJson[] } | null = null
 
-      const picked = pickSlackItem()
+      const picked = conversationInProgress.current ? null : pickSlackItem()
       if (picked) {
         usedSlackItems.current.add(picked.key)
         if (isSlackConversation(picked.item)) {
           startedConversation = { channel: picked.channel, messages: picked.item.messages }
-          setConversationActive(true)
+          conversationInProgress.current = true
           setActiveSlackChannel(picked.channel)
         } else {
           immediateMessage = picked.item
@@ -623,13 +630,12 @@ function GameBoard() {
       setActivePlayerCard(null)
       setActiveManagerCard(null)
 
-      // A conversation holds the round loop until it finishes playing out (see
-      // runConversation) — everything else advances to the next round right away.
+      // A conversation plays out on its own timer (see runConversation) alongside
+      // the round loop, which always advances to the next round right away.
       if (startedConversation) {
         runConversation(startedConversation.channel, startedConversation.messages, 0)
-      } else {
-        setRoundKey((k) => k + 1)
       }
+      setRoundKey((k) => k + 1)
     }, 900)
 
     return () => clearTimeout(resolveTimer)
@@ -637,6 +643,8 @@ function GameBoard() {
 
   return (
     <div className="game-board">
+      {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
+
       <div className="top-bar">
         <div className="top-bar-manager">
           <p className="side-label">Your manager</p>
@@ -683,6 +691,11 @@ function GameBoard() {
             <Hand cards={hand} draggingCardId={draggingCard?.id ?? null} onCardPointerDown={handleCardPointerDown} />
           </div>
         </div>
+      </div>
+
+      <div className="game-credit">
+        <p className="game-credit-title">Slay the Sprint</p>
+        <p className="game-credit-copyright">Copyright (c) 2026, Russell Curry, All Rights Reserved</p>
       </div>
 
       {draggingCard && (

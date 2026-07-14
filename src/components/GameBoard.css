@@ -6,6 +6,27 @@
   box-sizing: border-box;
   gap: 8px;
   padding: 12px;
+  position: relative;
+}
+
+.game-credit {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  text-align: right;
+  pointer-events: none;
+  color: #fff;
+}
+
+.game-credit-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.game-credit-copyright {
+  margin: 0;
+  font-size: 14px;
 }
 
 /* The manager area and the player's hand area each take a quarter of the available
