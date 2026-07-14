@@ -67,5 +67,28 @@
         "burnout": 20
       }
     ]
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "PM",
+        "text": "guys we just crossed 3 users. THREE. I am genuinely worried about our ability to scale here"
+      },
+      {
+        "character": "CTO",
+        "text": "there is no way our ten API servers can handle a load like this, we need to move to Kubernetes immediately"
+      },
+      {
+        "character": "Intern",
+        "text": "oh I read about Kubernetes once! it's the one with the little wheel logo right"
+      },
+      {
+        "character": "PM",
+        "text": "great, love the energy, let's move forward ASAP",
+        "techDebt": 25,
+        "burnout": 25
+      }
+    ]
   }
 ]
