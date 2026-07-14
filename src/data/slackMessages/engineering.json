@@ -1,0 +1,39 @@
+[
+  {
+    "character": "CTO",
+    "text": "Deploy is green. Please do not touch prod on a Friday, I am begging you.",
+    "techDebt": -10
+  },
+  {
+    "character": "Intern",
+    "text": "does anyone actually know what \"synergy\" means",
+    "burnout": 5
+  },
+  {
+    "character": "Intern",
+    "text": "found a TODO comment from 2019 that just says \"fix this later\"",
+    "techDebt": 15
+  },
+  {
+    "character": "CTO",
+    "text": "the tests are flaky again, merging anyway, wish me luck",
+    "techDebt": 25,
+    "burnout": 10
+  },
+  {
+    "character": "CTO",
+    "text": "I refactored the auth module, please don't ask me to explain it",
+    "techDebt": -30,
+    "burnout": 15
+  },
+  {
+    "character": "Intern",
+    "text": "who added a new microservice to talk to the OTHER microservice",
+    "techDebt": 20
+  },
+  {
+    "character": "CTO",
+    "text": "on-call was quiet all night for once, small miracles",
+    "burnout": -10
+  }
+]

@@ -9,6 +9,8 @@ import Meters from './Meters'
 import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
+import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
+import { slackChannels, CHANNEL_ORDER } from '../data/slackChannels'
 import './GameBoard.css'
 
 interface Rect {
@@ -79,8 +81,14 @@ interface RecurringEffect {
 
 function GameBoard() {
   // Shuffled once per mount (game start) so replays don't draw the same cards
-  // in the same order every time.
-  const managerDeck = useRef(shuffle(sampleManagerCards)).current
+  // in the same order every time — except the fat-slob card, which always opens.
+  const managerDeck = useRef(
+    (() => {
+      const opener = sampleManagerCards.find((c) => c.id === 'mc-coding-fat-slob')
+      const rest = sampleManagerCards.filter((c) => c.id !== 'mc-coding-fat-slob')
+      return opener ? [opener, ...shuffle(rest)] : shuffle(rest)
+    })(),
+  ).current
   // The rest of the shuffled deck beyond the starting hand feeds playerDrawPile below,
   // so every card is still reachable — just not all dealt into hand at once.
   const playerCardOrder = useRef(shuffle(sampleHand)).current
@@ -98,6 +106,10 @@ function GameBoard() {
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
   const [vesting, setVesting] = useState(0)
   const [roundKey, setRoundKey] = useState(0)
+
+  const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
+  const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
+  const slackMessageCounter = useRef(0)
 
   const [draggingCard, setDraggingCard] = useState<PlayerCard | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
@@ -261,7 +273,7 @@ function GameBoard() {
 
     const handleMove = (e: globalThis.PointerEvent) => setPos({ x: e.clientX, y: e.clientY })
     const handleUp = (e: globalThis.PointerEvent) => {
-      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.battle-area')
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.history-panel, .active-column')
       if (target) handleDropCard(draggingCard.id)
       setDraggingCard(null)
     }
@@ -485,21 +497,57 @@ function GameBoard() {
       const recurringBurnout = liveRecurringEffects.map((e) => e.burnout)
       const recurringVesting = liveRecurringEffects.map((e) => e.vesting)
 
+      // Once per round, a random flavor message posts to a random channel and nudges
+      // the meters same as a played card would — Slack is as much a source of
+      // backlog/tech debt/burnout/vesting churn as the actual cards.
+      const channel = CHANNEL_ORDER[Math.floor(Math.random() * CHANNEL_ORDER.length)]
+      const channelMessages = slackChannels[channel]
+      const message = channelMessages[Math.floor(Math.random() * channelMessages.length)]
+
+      slackMessageCounter.current += 1
+      setSlackMessages((prev) => [
+        ...prev,
+        {
+          id: `slack-${slackMessageCounter.current}`,
+          channel,
+          character: message.character,
+          text: message.text,
+          time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          backlog: message.backlog,
+          techDebt: message.techDebt,
+          burnout: message.burnout,
+          vesting: message.vesting,
+        },
+      ])
+      setActiveSlackChannel(channel)
+
       setBacklog((prev) =>
-        applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]),
+        applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, message.backlog, ...recurringBacklog]),
       )
       setTechnicalDebt((prev) =>
-        applyClearableDelta(prev, [playerTechnicalDebt, managerTechnicalDebt, resetSentinel, ...recurringTechnicalDebt]),
+        applyClearableDelta(prev, [
+          playerTechnicalDebt,
+          managerTechnicalDebt,
+          resetSentinel,
+          message.techDebt,
+          ...recurringTechnicalDebt,
+        ]),
       )
       setBurnout((prev) =>
-        Math.min(BURNOUT_MAX, Math.max(0, prev + sumDeltas([playerBurnout, managerBurnout, ...recurringBurnout]))),
+        Math.min(
+          BURNOUT_MAX,
+          Math.max(0, prev + sumDeltas([playerBurnout, managerBurnout, message.burnout, ...recurringBurnout])),
+        ),
       )
       // Vesting ticks up 1% every turn regardless of which cards were played, on top
       // of whatever the cards themselves add or subtract.
       setVesting((prev) =>
         Math.min(
           VESTING_MAX,
-          Math.max(0, prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting])),
+          Math.max(
+            0,
+            prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, message.vesting, ...recurringVesting]),
+          ),
         ),
       )
       setActivePlayerCard(null)
@@ -539,6 +587,12 @@ function GameBoard() {
           history={history}
           activePlayerCard={activePlayerCard}
           activeManagerCard={activeManagerCard}
+        />
+        <SlackPanel
+          channels={CHANNEL_ORDER}
+          activeChannel={activeSlackChannel}
+          onSelectChannel={setActiveSlackChannel}
+          messages={slackMessages}
         />
       </div>
 

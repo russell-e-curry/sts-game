@@ -28,7 +28,6 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
   { history, activePlayerCard, activeManagerCard },
   activeSlotRef,
 ) {
-  const battleAreaRef = useRef<HTMLDivElement>(null)
   const historyRowRef = useRef<HTMLDivElement>(null)
   const historyTrackRef = useRef<HTMLDivElement>(null)
   const scrollbarRef = useRef<HTMLDivElement>(null)
@@ -46,14 +45,8 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
   const dragStart = useRef({ pointerX: 0, offset: 0 })
 
   useLayoutEffect(() => {
-    const area = battleAreaRef.current
     const row = historyRowRef.current
-    if (!area || !row) return
-
-    // Reserve room for the active column so played cards never land on top of the last history card.
-    const referenceSlot = area.querySelector<HTMLElement>('.battle-slot')
-    const reserveWidth = referenceSlot ? referenceSlot.getBoundingClientRect().width : 0
-    row.style.right = reserveWidth ? `calc(50% + ${reserveWidth + 20}px)` : '50%'
+    if (!row) return
 
     const items = Array.from(row.querySelectorAll<HTMLElement>('.battle-column-history'))
     items.forEach((el) => {
@@ -108,10 +101,19 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
   useEffect(() => {
     if (!isDragging) return
 
+    // The track the thumb physically travels across (scrollbarWidth - thumbWidth) is
+    // usually much narrower than maxScrollOffset (the raw px of history overflow), so
+    // pointer movement must be scaled up to match — otherwise the thumb lags behind
+    // the cursor and the drag runs out of track before scrollOffset reaches its max.
+    const thumbWidth = Math.min(scrollbarWidth, Math.max(MIN_THUMB_WIDTH, scrollbarWidth * visibleFraction))
+    const trackRange = Math.max(1, scrollbarWidth - thumbWidth)
+    const scale = maxScrollOffset / trackRange
+
     const handleMove = (e: globalThis.PointerEvent) => {
-      const delta = e.clientX - dragStart.current.pointerX
+      const pointerDelta = e.clientX - dragStart.current.pointerX
       // Dragging the thumb left pushes the played cards right, uncovering earlier
       // rounds that were clipped off the edge.
+      const delta = pointerDelta * scale
       const next = Math.min(maxScrollOffset, Math.max(0, dragStart.current.offset - delta))
       setScrollOffset(next)
     }
@@ -123,7 +125,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
     }
-  }, [isDragging, maxScrollOffset])
+  }, [isDragging, maxScrollOffset, scrollbarWidth, visibleFraction])
 
   // Releasing the thumb always sends the played cards sliding back to their default
   // (newest-card-visible) position rather than leaving them scrolled.
@@ -141,8 +143,10 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
   const thumbLeft = (1 - scrollFraction) * Math.max(0, scrollbarWidth - thumbWidth)
 
   return (
-    <div className="battle-area" ref={battleAreaRef}>
-      <div className="history-row" ref={historyRowRef}>
+    <>
+      {/* Grid column 1 of .battle-row (see GameBoard.css) — the scrolling list of
+          already-played rounds. */}
+      <div className="history-panel" ref={historyRowRef}>
         <div
           className="history-track"
           ref={historyTrackRef}
@@ -184,6 +188,8 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
         </div>
       </div>
 
+      {/* Grid column 2 (auto-width, sized to just fit a card) — sits exactly centered
+          on screen because columns 1 and 3 share the same 1fr track. */}
       <div className="active-column">
         <div className="battle-slot" ref={activeSlotRef}>
           {activeManagerCard ? (
@@ -203,7 +209,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 })
 

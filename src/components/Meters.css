@@ -1,27 +1,39 @@
 .meters {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-direction: row;
+  gap: 24px;
   height: 100%;
-  width: 480px;
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
   box-sizing: border-box;
+}
+
+.meters-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12cqh;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
 }
 
 .meter-bar {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2.5cqh;
 }
 
 .meter-bar-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 5cqh;
 }
 
 .meter-bar-label {
-  font-size: 11px;
+  font-size: 6.9cqh;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
   text-transform: uppercase;
@@ -32,7 +44,7 @@
 }
 
 .meter-bar-track {
-  height: 18px;
+  height: 11cqh;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   overflow: hidden;
@@ -65,7 +77,7 @@
 }
 
 .meter-bar-value {
-  font-size: 12px;
+  font-size: 7.5cqh;
   font-weight: 700;
   color: #fff;
   text-align: right;

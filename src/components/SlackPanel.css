@@ -1,0 +1,206 @@
+/* Column 3 of .battle-row's grid (see GameBoard.css) — shares the 1fr track with
+   .history-panel, which is what keeps the dropzone column between them exactly
+   centered on screen regardless of window width. */
+.slack-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+}
+
+.slack-sidebar {
+  flex: 0 0 30%;
+  min-width: 0;
+  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  background: #2c1332;
+  padding: 14px 10px;
+  box-sizing: border-box;
+  gap: 12px;
+}
+
+.slack-workspace-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  padding: 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slack-channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.slack-channel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.slack-channel:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.slack-channel-hash {
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.slack-channel-active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-weight: 600;
+}
+
+.slack-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1a1b22;
+}
+
+.slack-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 700;
+  color: #fff;
+}
+
+.slack-header-hash {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+/* column-reverse + rendering messages newest-first (see SlackPanel.tsx) is the
+   classic CSS-only trick for a chat pane that stays pinned to the newest message
+   without any manual scrollTop/JS bookkeeping. */
+.slack-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.slack-messages-empty {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.slack-message {
+  display: flex;
+  gap: 8px;
+}
+
+.slack-avatar {
+  flex-shrink: 0;
+  width: 43px;
+  height: 43px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.slack-avatar-img {
+  object-fit: cover;
+}
+
+.slack-message-body {
+  min-width: 0;
+}
+
+.slack-message-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.slack-message-author {
+  font-weight: 700;
+  color: #fff;
+  font-size: 13px;
+}
+
+.slack-message-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.slack-message-text {
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+}
+
+.slack-message-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+
+.slack-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.slack-badge-backlog {
+  background: linear-gradient(90deg, #2f8fff, #1a5fd6);
+}
+
+.slack-badge-techdebt {
+  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+}
+
+.slack-badge-burnout {
+  background: linear-gradient(90deg, #ff6b5b, #c81e1e);
+}
+
+.slack-badge-vesting {
+  background: linear-gradient(90deg, #ffd76a, #d4a017);
+  color: #23242c;
+}
+
+.slack-composer {
+  flex: 0 0 auto;
+  margin: 0 16px 14px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+.slack-composer-placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}

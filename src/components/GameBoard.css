@@ -95,12 +95,13 @@
    .hud-panel — and the bars inside it — end up exactly as tall as the manager's card
    row, not the whole column (which would also include the label's height). */
 .hud {
-  flex: 0 0 auto;
+  flex: 0 1 640px;
   align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 0;
+  min-width: 0;
 }
 
 .hud-spacer {
@@ -113,15 +114,26 @@
   display: flex;
   align-items: stretch;
   box-sizing: border-box;
+  overflow: hidden;
   background: linear-gradient(135deg, rgba(122, 31, 214, 0.25), rgba(20, 21, 31, 0.6));
   border: 1px solid var(--border-accent);
   border-radius: 16px;
   padding: 10px 20px;
   box-shadow: 0 0 24px rgba(122, 31, 214, 0.25);
+  /* Sized in cqh (percent of this panel's own height), same idea as .game-card's
+     container-type: inline-size — lets the meter bars shrink with the row's height
+     instead of overflowing it when the window gets short. container-type: size (not
+     inline-size) is needed here since it's the block axis being queried. */
+  container-type: size;
 }
 
+/* Three columns: history (left) and the Slack panel (right) share the 1fr track, so
+   whatever space each gives up or takes stays mirrored — that's what keeps the
+   dropzone column (auto-width, sized to just fit a card) exactly centered on screen
+   no matter the window width, rather than centered within some sub-box. */
 .battle-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: stretch;
   gap: 20px;
 }

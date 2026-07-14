@@ -1,0 +1,39 @@
+[
+  {
+    "character": "VP",
+    "text": "Quick sync in 5 — nothing major, just circling back on the circle-back.",
+    "burnout": 10
+  },
+  {
+    "character": "VP",
+    "text": "Loving the energy team! Let's take this offline 🙌",
+    "burnout": 5
+  },
+  {
+    "character": "VP",
+    "text": "Great question, added it to Thursday's agenda.",
+    "backlog": 20
+  },
+  {
+    "character": "VP",
+    "text": "Just a heads up, we're going to need everyone to be a bit more scrappy this sprint.",
+    "burnout": 15
+  },
+  {
+    "character": "VP",
+    "text": "Reminder: mandatory fun is at 4pm today. Attendance is optional but tracked.",
+    "burnout": 10,
+    "vesting": -1
+  },
+  {
+    "character": "VP",
+    "text": "Per my last email.",
+    "burnout": 8
+  },
+  {
+    "character": "VP",
+    "text": "I know we said no new initiatives this quarter, but hear me out.",
+    "backlog": 40,
+    "techDebt": 20
+  }
+]

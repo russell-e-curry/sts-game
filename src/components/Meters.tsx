@@ -23,43 +23,47 @@ function Meters({ backlog, technicalDebt, burnout, vesting }: MetersProps) {
 
   return (
     <div className="meters">
-      <div className="meter-bar">
-        <div className="meter-bar-top">
-          <span className="meter-bar-label">Backlog</span>
-          <span className="meter-bar-value">{backlogPct}%</span>
+      <div className="meters-column">
+        <div className="meter-bar">
+          <div className="meter-bar-top">
+            <span className="meter-bar-label">Backlog</span>
+            <span className="meter-bar-value">{backlogPct}%</span>
+          </div>
+          <div className="meter-bar-track">
+            <div className="meter-bar-fill meter-bar-fill-backlog" style={{ width: `${backlogPct}%` }} />
+          </div>
         </div>
-        <div className="meter-bar-track">
-          <div className="meter-bar-fill meter-bar-fill-backlog" style={{ width: `${backlogPct}%` }} />
+
+        <div className="meter-bar">
+          <div className="meter-bar-top">
+            <span className="meter-bar-label">Tech Debt</span>
+            <span className="meter-bar-value">{technicalDebtPct}%</span>
+          </div>
+          <div className="meter-bar-track">
+            <div className="meter-bar-fill meter-bar-fill-techdebt" style={{ width: `${technicalDebtPct}%` }} />
+          </div>
         </div>
       </div>
 
-      <div className="meter-bar">
-        <div className="meter-bar-top">
-          <span className="meter-bar-label">Tech Debt</span>
-          <span className="meter-bar-value">{technicalDebtPct}%</span>
+      <div className="meters-column">
+        <div className="meter-bar">
+          <div className="meter-bar-top">
+            <span className="meter-bar-label">Burnout</span>
+            <span className="meter-bar-value">{burnoutPct}%</span>
+          </div>
+          <div className="meter-bar-track">
+            <div className="meter-bar-fill meter-bar-fill-burnout" style={{ width: `${burnoutPct}%` }} />
+          </div>
         </div>
-        <div className="meter-bar-track">
-          <div className="meter-bar-fill meter-bar-fill-techdebt" style={{ width: `${technicalDebtPct}%` }} />
-        </div>
-      </div>
 
-      <div className="meter-bar">
-        <div className="meter-bar-top">
-          <span className="meter-bar-label">Burnout</span>
-          <span className="meter-bar-value">{burnoutPct}%</span>
-        </div>
-        <div className="meter-bar-track">
-          <div className="meter-bar-fill meter-bar-fill-burnout" style={{ width: `${burnoutPct}%` }} />
-        </div>
-      </div>
-
-      <div className="meter-bar">
-        <div className="meter-bar-top">
-          <span className="meter-bar-label">Vesting</span>
-          <span className="meter-bar-value">{vestingPct}%</span>
-        </div>
-        <div className="meter-bar-track">
-          <div className="meter-bar-fill meter-bar-fill-vesting" style={{ width: `${vestingPct}%` }} />
+        <div className="meter-bar">
+          <div className="meter-bar-top">
+            <span className="meter-bar-label">Vesting</span>
+            <span className="meter-bar-value">{vestingPct}%</span>
+          </div>
+          <div className="meter-bar-track">
+            <div className="meter-bar-fill meter-bar-fill-vesting" style={{ width: `${vestingPct}%` }} />
+          </div>
         </div>
       </div>
     </div>

@@ -1,30 +1,26 @@
-.battle-area {
+/* Column 1 of .battle-row's grid (see GameBoard.css) — the scrolling list of
+   already-played rounds. Carries the "battle arena" look (dashed border, purple glow)
+   that used to wrap this and the active column together; the dropzone slots read as
+   drop targets on their own via .battle-slot-placeholder's dashed border, so they
+   don't need a shared outer box anymore. */
+.history-panel {
   position: relative;
-  flex: 1;
+  min-width: 0;
   min-height: 0;
   border: 2px dashed rgba(170, 59, 255, 0.4);
   border-radius: 16px;
   background: radial-gradient(ellipse at center, rgba(122, 31, 214, 0.18), transparent 70%);
-  overflow: hidden;
-}
-
-.battle-area:has(.game-card-hovered) {
-  overflow: visible;
-}
-
-.history-row {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 50%;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
   padding: 8px 20px 24px;
   box-sizing: border-box;
   overflow: hidden;
-  z-index: 1;
+}
+
+.history-panel:has(.game-card-hovered) {
+  overflow: visible;
+  z-index: 500;
 }
 
 .history-track {
@@ -35,7 +31,7 @@
   flex-shrink: 0;
 }
 
-/* Sits in the gutter opened up by .history-row's extra bottom padding, spanning the
+/* Sits in the gutter opened up by .history-panel's extra bottom padding, spanning the
    same horizontal extent as the played-card columns above it. Always mounted (rather
    than conditionally rendered) so it can be measured to detect overflow in the first
    place; faded out via opacity/pointer-events when there's nothing to scroll. */
@@ -77,16 +73,6 @@
   cursor: grabbing;
 }
 
-/* A hovered card lifts into a fixed overlay, but .history-row (z-index: 1) and
-   .active-column (z-index: 2) are stacking contexts that would otherwise trap that
-   overlay beneath its siblings — including the hand cards (z-index: 50). Raise the
-   whole row/column above everything persistent (drag ghost/flight stay higher) so the
-   hovered card is on top of the entire board. */
-.history-row:has(.game-card-hovered) {
-  overflow: visible;
-  z-index: 500;
-}
-
 .battle-column-history {
   position: relative;
   height: 100%;
@@ -112,33 +98,26 @@
   }
 }
 
-/* Spans the full width with its slots centered (align-items) instead of being a
-   narrow column centered via transform: translateX(-50%). A transform here would make
-   the hovered card's position: fixed overlay resolve against this element rather than
-   the viewport, throwing it off-screen. pointer-events lets the empty gutter fall
-   through to the history cards underneath. */
+/* Column 2 of .battle-row's grid — auto-width (just wide enough for a card plus some
+   breathing room for its own dashed border), and exactly centered on screen because
+   columns 1 and 3 share the same 1fr track. */
 .active-column {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding: 8px 0 24px;
+  padding: 8px 14px 24px;
   box-sizing: border-box;
-  z-index: 2;
-  pointer-events: none;
+  border: 2px dashed rgba(170, 59, 255, 0.4);
+  border-radius: 16px;
 }
 
-.active-column .battle-slot {
-  pointer-events: auto;
-}
-
+/* A hovered card lifts into a fixed overlay; raise this column above the hand cards
+   (z-index: 50) so the hovered card renders on top of the whole board. */
 .active-column:has(.game-card-hovered) {
   z-index: 500;
 }

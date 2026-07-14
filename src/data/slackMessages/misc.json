@@ -1,0 +1,31 @@
+[
+  {
+    "character": "HR",
+    "text": "Free bagels in the break room, first come first served.",
+    "burnout": -10
+  },
+  {
+    "character": "HR",
+    "text": "PSA: the office plant on the 3rd floor has died again.",
+    "burnout": 2
+  },
+  {
+    "character": "HR",
+    "text": "Anyone else's badge not working on the elevator this morning?",
+    "burnout": 5
+  },
+  {
+    "character": "HR",
+    "text": "Reminder to submit your expense reports before the end of the month."
+  },
+  {
+    "character": "HR",
+    "text": "The vending machine ate my dollar, this is my villain origin story.",
+    "burnout": 8
+  },
+  {
+    "character": "HR",
+    "text": "Happy hour Friday! Attendance strongly, extremely, not-at-all optional.",
+    "burnout": -5
+  }
+]

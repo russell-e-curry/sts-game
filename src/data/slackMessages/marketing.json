@@ -1,0 +1,35 @@
+[
+  {
+    "character": "CMO",
+    "text": "Can we make the button more... pop? Not sure how, just more.",
+    "backlog": 15
+  },
+  {
+    "character": "CMO",
+    "text": "The launch campaign is going viral! Well, one person liked it, but still.",
+    "vesting": 1
+  },
+  {
+    "character": "CMO",
+    "text": "We need this rebranded by end of day, no pressure.",
+    "burnout": 15,
+    "backlog": 10
+  },
+  {
+    "character": "CMO",
+    "text": "Can engineering just add a blockchain element to the landing page?",
+    "backlog": 30,
+    "techDebt": 15
+  },
+  {
+    "character": "CMO",
+    "text": "Our competitor just launched the same feature, we need it yesterday.",
+    "burnout": 20,
+    "backlog": 25
+  },
+  {
+    "character": "CMO",
+    "text": "Sent the newsletter to the wrong list again, no one noticed though.",
+    "burnout": 5
+  }
+]
