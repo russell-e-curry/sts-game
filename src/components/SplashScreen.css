@@ -24,11 +24,19 @@
   max-width: 760px;
   text-align: center;
   gap: 20px;
+  /* Safety net for short windows: title + subtitle + image + rules + button can add
+     up to more height than a short viewport leaves after the 48px top/bottom padding
+     (e.g. a 720px-tall window), which previously pushed the START button below the
+     visible area with no way to reach it — this keeps it reachable via scroll instead
+     of silently clipped by body's overflow:hidden. */
+  overflow-y: auto;
 }
 
 .splash-image {
   max-width: 720px;
-  max-height: 520px;
+  /* Scales down on short viewports before resorting to the scrollbar above — 520px
+     flat was tall enough on its own to force scrolling on a plain 720px-tall window. */
+  max-height: min(520px, 38vh);
   width: auto;
   height: auto;
   object-fit: contain;
