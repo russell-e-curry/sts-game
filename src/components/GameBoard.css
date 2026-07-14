@@ -112,21 +112,15 @@
   min-height: 0;
 }
 
-/* Mirrors .top-bar-manager's column structure (invisible label + content row) so
-   .hud-panel — and the bars inside it — end up exactly as tall as the manager's card
-   row, not the whole column (which would also include the label's height). */
+/* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full row
+   height, same as .ad-slot beside it. */
 .hud {
   flex: 0 1 640px;
   align-self: stretch;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   min-height: 0;
   min-width: 0;
-}
-
-.hud-spacer {
-  visibility: hidden;
 }
 
 .hud-panel {

@@ -659,14 +659,13 @@ function GameBoard() {
           </div>
         </div>
 
-        <AdSlot />
-
         <div className="hud">
-          <p className="side-label hud-spacer">Your manager</p>
           <div className="hud-panel">
             <Meters backlog={backlog} technicalDebt={technicalDebt} burnout={burnout} vesting={vesting} />
           </div>
         </div>
+
+        <AdSlot />
       </div>
 
       <div className="battle-row">
