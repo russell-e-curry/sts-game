@@ -6,6 +6,7 @@ import { shuffle } from '../lib/shuffle'
 import Deck from './Deck'
 import ManagerHand from './ManagerHand'
 import Meters from './Meters'
+import AdSlot from './AdSlot'
 import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
@@ -657,6 +658,8 @@ function GameBoard() {
             </div>
           </div>
         </div>
+
+        <AdSlot />
 
         <div className="hud">
           <p className="side-label hud-spacer">Your manager</p>

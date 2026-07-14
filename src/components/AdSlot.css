@@ -1,0 +1,14 @@
+/* Sits between .top-bar-manager and .hud (see GameBoard.tsx) — fixed width so it
+   doesn't fight the manager hand / meters for space, full height of the top row. */
+.ad-slot {
+  flex: 0 0 160px;
+  align-self: stretch;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
