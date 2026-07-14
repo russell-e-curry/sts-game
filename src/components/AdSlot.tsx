@@ -35,8 +35,8 @@ function AdSlot() {
     const ins = document.createElement('ins')
     ins.className = 'adsbygoogle'
     ins.style.display = 'inline-block'
-    ins.style.width = '728px'
-    ins.style.height = '90px'
+    ins.style.width = '300px'
+    ins.style.height = '250px'
     ins.dataset.adClient = 'ca-pub-6973096670074517'
     ins.dataset.adSlot = AD_SLOT_ID
     container.appendChild(ins)
