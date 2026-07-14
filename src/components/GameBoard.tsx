@@ -10,7 +10,8 @@ import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
 import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
-import { slackChannels, CHANNEL_ORDER } from '../data/slackChannels'
+import { allSlackItems, isSlackConversation, CHANNEL_ORDER } from '../data/slackChannels'
+import type { SlackMessageJson } from '../data/slackMessages/schema'
 import './GameBoard.css'
 
 interface Rect {
@@ -109,7 +110,14 @@ function GameBoard() {
 
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
+  // True while a picked conversation is playing itself out message-by-message — the
+  // round loop (and the player's ability to respond) is frozen until it's done.
+  const [conversationActive, setConversationActive] = useState(false)
   const slackMessageCounter = useRef(0)
+  // Keys (see allSlackItems) of every message/conversation already posted this game,
+  // so none of them repeat for the rest of the session.
+  const usedSlackItems = useRef<Set<string>>(new Set())
+  const conversationTimers = useRef<number[]>([])
 
   const [draggingCard, setDraggingCard] = useState<PlayerCard | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
@@ -236,17 +244,72 @@ function GameBoard() {
     )
   }
 
+  // Picks a random still-unused message or conversation from across every channel —
+  // once something is picked it's marked used by the caller so it never repeats for
+  // the rest of the game.
+  const pickSlackItem = () => {
+    const available = allSlackItems().filter((i) => !usedSlackItems.current.has(i.key))
+    if (available.length === 0) return null
+    return available[Math.floor(Math.random() * available.length)]
+  }
+
+  const postSlackMessage = (channel: string, msg: SlackMessageJson) => {
+    slackMessageCounter.current += 1
+    setSlackMessages((prev) => [
+      ...prev,
+      {
+        id: `slack-${slackMessageCounter.current}`,
+        channel,
+        character: msg.character,
+        text: msg.text,
+        time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        backlog: msg.backlog,
+        techDebt: msg.techDebt,
+        burnout: msg.burnout,
+        vesting: msg.vesting,
+      },
+    ])
+    setActiveSlackChannel(channel)
+  }
+
+  // Plays a conversation's messages out one at a time, 1-10s apart, applying each
+  // message's own stat deltas as it lands — the round loop only resumes (via
+  // roundKey) once every message in the conversation has posted, so the manager
+  // won't play its next card (and the player has nothing to respond to) until then.
+  const runConversation = (channel: string, messages: SlackMessageJson[], index: number) => {
+    if (index >= messages.length) {
+      setConversationActive(false)
+      setRoundKey((k) => k + 1)
+      return
+    }
+
+    const delay = 1000 + Math.random() * 9000
+    conversationTimers.current.push(
+      window.setTimeout(() => {
+        const msg = messages[index]
+        postSlackMessage(channel, msg)
+        setBacklog((prev) => applyClearableDelta(prev, [msg.backlog]))
+        setTechnicalDebt((prev) => applyClearableDelta(prev, [msg.techDebt]))
+        setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + (msg.burnout ?? 0))))
+        setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + (msg.vesting ?? 0))))
+        runConversation(channel, messages, index + 1)
+      }, delay),
+    )
+  }
+
   useEffect(() => {
     return () => {
       playerDrawTimers.current.forEach((t) => clearTimeout(t))
       playerDrawTimers.current = []
       managerDrawTimers.current.forEach((t) => clearTimeout(t))
       managerDrawTimers.current = []
+      conversationTimers.current.forEach((t) => clearTimeout(t))
+      conversationTimers.current = []
     }
   }, [])
 
   const handleDropCard = (cardId: string) => {
-    if (!activeManagerCard || activePlayerCard) return
+    if (!activeManagerCard || activePlayerCard || conversationActive) return
     const slotIndex = hand.findIndex((c) => c?.id === cardId)
     if (slotIndex === -1) return
     const card = hand[slotIndex]!
@@ -497,46 +560,51 @@ function GameBoard() {
       const recurringBurnout = liveRecurringEffects.map((e) => e.burnout)
       const recurringVesting = liveRecurringEffects.map((e) => e.vesting)
 
-      // Once per round, a random flavor message posts to a random channel and nudges
-      // the meters same as a played card would — Slack is as much a source of
-      // backlog/tech debt/burnout/vesting churn as the actual cards.
-      const channel = CHANNEL_ORDER[Math.floor(Math.random() * CHANNEL_ORDER.length)]
-      const channelMessages = slackChannels[channel]
-      const message = channelMessages[Math.floor(Math.random() * channelMessages.length)]
+      // Once per round, a random still-unused flavor message (or whole conversation)
+      // posts to its channel and nudges the meters same as a played card would. A
+      // conversation's deltas are applied message-by-message as it plays out instead
+      // of all at once here (see runConversation), so it's excluded below when picked.
+      let immediateMessage: SlackMessageJson | null = null
+      let startedConversation: { channel: string; messages: SlackMessageJson[] } | null = null
 
-      slackMessageCounter.current += 1
-      setSlackMessages((prev) => [
-        ...prev,
-        {
-          id: `slack-${slackMessageCounter.current}`,
-          channel,
-          character: message.character,
-          text: message.text,
-          time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-          backlog: message.backlog,
-          techDebt: message.techDebt,
-          burnout: message.burnout,
-          vesting: message.vesting,
-        },
-      ])
-      setActiveSlackChannel(channel)
+      const picked = pickSlackItem()
+      if (picked) {
+        usedSlackItems.current.add(picked.key)
+        if (isSlackConversation(picked.item)) {
+          startedConversation = { channel: picked.channel, messages: picked.item.messages }
+          setConversationActive(true)
+          setActiveSlackChannel(picked.channel)
+        } else {
+          immediateMessage = picked.item
+          postSlackMessage(picked.channel, picked.item)
+        }
+      }
 
       setBacklog((prev) =>
-        applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, message.backlog, ...recurringBacklog]),
+        applyClearableDelta(prev, [
+          playerBacklog,
+          managerBacklog,
+          resetSentinel,
+          immediateMessage?.backlog,
+          ...recurringBacklog,
+        ]),
       )
       setTechnicalDebt((prev) =>
         applyClearableDelta(prev, [
           playerTechnicalDebt,
           managerTechnicalDebt,
           resetSentinel,
-          message.techDebt,
+          immediateMessage?.techDebt,
           ...recurringTechnicalDebt,
         ]),
       )
       setBurnout((prev) =>
         Math.min(
           BURNOUT_MAX,
-          Math.max(0, prev + sumDeltas([playerBurnout, managerBurnout, message.burnout, ...recurringBurnout])),
+          Math.max(
+            0,
+            prev + sumDeltas([playerBurnout, managerBurnout, immediateMessage?.burnout, ...recurringBurnout]),
+          ),
         ),
       )
       // Vesting ticks up 1% every turn regardless of which cards were played, on top
@@ -546,13 +614,22 @@ function GameBoard() {
           VESTING_MAX,
           Math.max(
             0,
-            prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, message.vesting, ...recurringVesting]),
+            prev +
+              VESTING_PER_TURN +
+              sumDeltas([playerVesting, managerVesting, immediateMessage?.vesting, ...recurringVesting]),
           ),
         ),
       )
       setActivePlayerCard(null)
       setActiveManagerCard(null)
-      setRoundKey((k) => k + 1)
+
+      // A conversation holds the round loop until it finishes playing out (see
+      // runConversation) — everything else advances to the next round right away.
+      if (startedConversation) {
+        runConversation(startedConversation.channel, startedConversation.messages, 0)
+      } else {
+        setRoundKey((k) => k + 1)
+      }
     }, 900)
 
     return () => clearTimeout(resolveTimer)

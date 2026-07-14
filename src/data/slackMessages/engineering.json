@@ -35,5 +35,37 @@
     "character": "CTO",
     "text": "on-call was quiet all night for once, small miracles",
     "burnout": -10
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "Intern",
+        "text": "hey uh, is it normal for the deploy pipeline to be stuck at 97% for 20 minutes"
+      },
+      {
+        "character": "CTO",
+        "text": "that's normal, don't worry about it"
+      },
+      {
+        "character": "Intern",
+        "text": "ok it just hit 100% and now it says \"rolling back\""
+      },
+      {
+        "character": "CTO",
+        "text": "that's also normal, don't worry about it",
+        "techDebt": 15,
+        "burnout": 10
+      },
+      {
+        "character": "Intern",
+        "text": "should I page someone"
+      },
+      {
+        "character": "CTO",
+        "text": "I am someone. I am handling it right now.",
+        "burnout": 20
+      }
+    ]
   }
 ]

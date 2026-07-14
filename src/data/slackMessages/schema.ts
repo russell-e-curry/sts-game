@@ -13,3 +13,13 @@ export interface SlackMessageJson {
   /** Signed percentage delta applied to vesting when this message is posted. Omit if it doesn't touch it. */
   vesting?: number
 }
+
+// A conversation is a back-and-forth of several messages that plays out on its own
+// timer (1-10s apart) once picked, instead of posting all at once like a single
+// message — see the round-resolution effect in GameBoard.tsx.
+export interface SlackConversationJson {
+  conversation: true
+  messages: SlackMessageJson[]
+}
+
+export type SlackChannelItemJson = SlackMessageJson | SlackConversationJson
