@@ -1,0 +1,8 @@
+{
+  "title": "Nepotism",
+  "type": "coding",
+  "action": "one time",
+  "description": "Your boss' slob nephew invents his own CI/CD platform, the boss wants it implemented asap.",
+  "backlog": 50,
+  "burnout": 25
+}

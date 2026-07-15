@@ -1,6 +1,6 @@
 export interface SlackMessageJson {
   /** Who "wrote" this message, e.g. "CMO" — the profile picture is looked up from
-   * this name (see slackPfp in slackChannels.ts), at public/slack-pfps/slack-pfp-<name, lowercased and hyphenated>.png. */
+   * this name (see slackPfp in slackChannels.ts), at public/slack-pfps/slack-pfp-<name, lowercased and hyphenated>.webp. */
   character: string
   /** The message text as it appears in the channel. */
   text: string

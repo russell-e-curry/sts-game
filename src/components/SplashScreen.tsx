@@ -13,7 +13,7 @@ function SplashScreen({ onStart }: SplashScreenProps) {
 
         <img
           className="splash-image"
-          src="/splash/sts-splash-screen.png"
+          src="/splash/sts-splash-screen.webp"
           alt=""
           onError={(e) => {
             e.currentTarget.style.display = 'none'

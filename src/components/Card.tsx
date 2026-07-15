@@ -20,7 +20,7 @@ interface CardProps<T extends GameCard> {
 // Every card enlarges to the same absolute size, pinned to what a played (battle-slot)
 // card looks like at this zoom level — a .battle-slot is always in the DOM to measure
 // against — so a hand card and a battle card reach the exact same on-screen size.
-const HOVER_SCALE = 2.2
+const HOVER_SCALE = 2.35
 // Enlarged cards are taller than the resting 1.4 ratio: the enlarged art frame is a
 // full-width square (so the square artwork fills it), which needs extra height on top
 // of the header/name/description/footer. Every enlarged card uses this same ratio, so

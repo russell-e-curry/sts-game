@@ -1,0 +1,8 @@
+{
+  "title": "Team Building",
+  "type": "management",
+  "action": "one time",
+  "description": "Not the best place for a selfie. Your team loses its QA lead.",
+  "technicalDebt": 100,
+  "backlog" : 50
+}

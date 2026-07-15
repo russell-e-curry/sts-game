@@ -1,0 +1,8 @@
+{
+  "title": "Team Building",
+  "type": "management",
+  "action": "one time",
+  "description": "So much for those discount bungie jump coupons. The team will bounce back, but he won't. You just lost a senior dev",
+  "technicalDebt": 100,
+  "burnout": 25
+}

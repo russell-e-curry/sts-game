@@ -1,0 +1,8 @@
+{
+  "title": "Team Building",
+  "type": "management",
+  "action": "one time",
+  "description": "If it starts with \"Hold my beer!\" it's not going to end well. The devops team is about to get smaller.",
+  "technicalDebt": 100,
+  "burnout" : 50
+}

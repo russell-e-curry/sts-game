@@ -15,6 +15,6 @@ export const sampleHand: PlayerCard[] = Object.entries(modules).map(([path, data
     side: 'player',
     ...data,
     // The JSON file and its art share a filename, so the image never needs its own field.
-    image: `/cards/player/${id}.png`,
+    image: `/cards/player/${id}.webp`,
   }
 })

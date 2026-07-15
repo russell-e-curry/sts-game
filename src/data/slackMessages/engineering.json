@@ -90,5 +90,44 @@
         "burnout": 25
       }
     ]
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "CTO",
+        "text": "reading the cost report and this word keeps popping up. \"Lambdas.\" who authorized livestock in the server room"
+      },
+      {
+        "character": "Intern",
+        "text": "not literal sheep, sir. AWS Lambda is serverless compute, it runs code without provisioning any servers"
+      },
+      {
+        "character": "CTO",
+        "text": "\"serverless.\" right, the hardware just teleports in from a cloud dimension"
+      },
+      {
+        "character": "Intern",
+        "text": "they're event-driven functions, a trigger fires, the code runs for a moment, then it shuts off. we only pay for that instant"
+      },
+      {
+        "character": "CTO",
+        "text": "invisible creatures doing tasks and then dying. that's a liability nightmare, do we have animal control for the API"
+      },
+      {
+        "character": "Intern",
+        "text": "it's not biological sir, it just saves us from paying for an idle VM 24/7"
+      },
+      {
+        "character": "CTO",
+        "text": "I don't care how efficient the sheep are, get rid of them. real, God-fearing EC2 instances only",
+        "techDebt": 20,
+        "burnout": 10
+      },
+      {
+        "character": "Intern",
+        "text": "...yes sir. starting the migration to EC2 now"
+      }
+    ]
   }
 ]

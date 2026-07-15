@@ -24,7 +24,7 @@ export const CHANNEL_ORDER = ['Management', 'Engineering', 'Marketing', 'Misc']
 // drop the matching image in public/slack-pfps/ and it shows up automatically.
 export function slackPfp(character: string) {
   const slug = character.trim().toLowerCase().replace(/\s+/g, '-')
-  return `/slack-pfps/slack-pfp-${slug}.png`
+  return `/slack-pfps/slack-pfp-${slug}.webp`
 }
 
 export function isSlackConversation(item: SlackChannelItemJson): item is SlackConversationJson {

@@ -46,12 +46,13 @@
   gap: 2cqw;
 }
 
-/* Square frame in the enlarged view: the artwork is square, so a square frame lets it
-   fill the full card width AND show the whole image with no cropping or side letterbox
-   (object-fit: cover inherited from the base rule fills a square image edge-to-edge). */
+/* Most source art is ~4:3 landscape, not square — a square frame made object-fit:
+   cover crop off a big chunk of the image's left/right edges. A 4:3 frame matches the
+   source aspect so cover shows the image's full horizontal extent (square art just
+   gets cropped top/bottom instead, which loses far less of the artwork). */
 .game-card-overlay .game-card-art-frame {
   height: auto;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
 }
 
 .game-card-dimmed {

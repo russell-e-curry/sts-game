@@ -15,6 +15,11 @@ function pct(value: number, max: number) {
   return Math.round(Math.min(100, (value / max) * 100))
 }
 
+// Danger stats (backlog/tech debt/burnout) flash red-hot once they're most of the way
+// to maxed out; vesting flips the framing and celebrates in gold instead, since high
+// is good there.
+const CRITICAL_THRESHOLD = 80
+
 function Meters({ backlog, technicalDebt, burnout, vesting }: MetersProps) {
   const backlogPct = pct(backlog, STAT_MAX)
   const technicalDebtPct = pct(technicalDebt, STAT_MAX)
@@ -27,20 +32,26 @@ function Meters({ backlog, technicalDebt, burnout, vesting }: MetersProps) {
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Backlog</span>
-            <span className="meter-bar-value">{backlogPct}%</span>
+            <span className="meter-bar-value meter-bar-value-backlog">{backlogPct}%</span>
           </div>
           <div className="meter-bar-track">
-            <div className="meter-bar-fill meter-bar-fill-backlog" style={{ width: `${backlogPct}%` }} />
+            <div
+              className={`meter-bar-fill meter-bar-fill-backlog${backlogPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}`}
+              style={{ width: `${backlogPct}%` }}
+            />
           </div>
         </div>
 
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Tech Debt</span>
-            <span className="meter-bar-value">{technicalDebtPct}%</span>
+            <span className="meter-bar-value meter-bar-value-techdebt">{technicalDebtPct}%</span>
           </div>
           <div className="meter-bar-track">
-            <div className="meter-bar-fill meter-bar-fill-techdebt" style={{ width: `${technicalDebtPct}%` }} />
+            <div
+              className={`meter-bar-fill meter-bar-fill-techdebt${technicalDebtPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}`}
+              style={{ width: `${technicalDebtPct}%` }}
+            />
           </div>
         </div>
       </div>
@@ -49,20 +60,26 @@ function Meters({ backlog, technicalDebt, burnout, vesting }: MetersProps) {
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Burnout</span>
-            <span className="meter-bar-value">{burnoutPct}%</span>
+            <span className="meter-bar-value meter-bar-value-burnout">{burnoutPct}%</span>
           </div>
           <div className="meter-bar-track">
-            <div className="meter-bar-fill meter-bar-fill-burnout" style={{ width: `${burnoutPct}%` }} />
+            <div
+              className={`meter-bar-fill meter-bar-fill-burnout${burnoutPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}`}
+              style={{ width: `${burnoutPct}%` }}
+            />
           </div>
         </div>
 
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Vesting</span>
-            <span className="meter-bar-value">{vestingPct}%</span>
+            <span className="meter-bar-value meter-bar-value-vesting">{vestingPct}%</span>
           </div>
           <div className="meter-bar-track">
-            <div className="meter-bar-fill meter-bar-fill-vesting" style={{ width: `${vestingPct}%` }} />
+            <div
+              className={`meter-bar-fill meter-bar-fill-vesting${vestingPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-celebrate' : ''}`}
+              style={{ width: `${vestingPct}%` }}
+            />
           </div>
         </div>
       </div>

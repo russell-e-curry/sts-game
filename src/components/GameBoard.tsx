@@ -24,6 +24,7 @@ interface Rect {
 }
 
 interface Flight {
+  key: number
   card: ManagerCard
   source: Rect
   dest: Rect
@@ -32,6 +33,7 @@ interface Flight {
 }
 
 interface PlayerFlight {
+  key: number
   card: PlayerCard
   slotIndex: number
   source: Rect
@@ -41,6 +43,7 @@ interface PlayerFlight {
 }
 
 interface ManagerDrawFlight {
+  key: number
   slotId: string
   source: Rect
   dest: Rect
@@ -95,8 +98,13 @@ function GameBoard() {
   // The rest of the shuffled deck beyond the starting hand feeds playerDrawPile below,
   // so every card is still reachable — just not all dealt into hand at once.
   const playerCardOrder = useRef(shuffle(sampleHand)).current
-  const [hand, setHand] = useState<(PlayerCard | null)[]>(() => playerCardOrder.slice(0, HAND_SIZE))
-  const [usedManagerIds, setUsedManagerIds] = useState<Set<string>>(() => new Set())
+  // Both hands start empty — the opening-deal effect below animates all twelve cards
+  // (six manager, six player) into their slots once the splash screen is dismissed.
+  const [hand, setHand] = useState<(PlayerCard | null)[]>(() => Array(HAND_SIZE).fill(null))
+  const [usedManagerIds, setUsedManagerIds] = useState<Set<string>>(() => new Set(MANAGER_SLOT_IDS))
+  // Flips true once the opening deal finishes, gating the manager's first round-start
+  // play so it can't fly a card out of a hand slot that hasn't been dealt into yet.
+  const [dealt, setDealt] = useState(false)
   const [hiddenHandId, setHiddenHandId] = useState<string | null>(null)
   const [history, setHistory] = useState<ResolvedRound[]>([])
   const [activePlayerCard, setActivePlayerCard] = useState<PlayerCard | null>(null)
@@ -138,6 +146,11 @@ function GameBoard() {
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
   const roundCounter = useRef(0)
+  // Gives every flight (manager play, player draw, manager draw) a unique React key
+  // so back-to-back flights — as when the opening deal chains six draws in a row —
+  // always remount a fresh element instead of reusing one whose CSS transition would
+  // otherwise ease from wherever the previous card landed.
+  const flightKeyCounter = useRef(0)
   // Every card ever played with action 'recurring' (that wasn't reversed away),
   // whose deltas keep getting re-applied on every subsequent turn — not just the
   // turn it was played.
@@ -148,13 +161,13 @@ function GameBoard() {
   const managerPlayCount = useRef(0)
   // Cards not currently in hand: drawn from (shuffling the discard back in once
   // exhausted) whenever a played card's slot needs a replacement.
-  const playerDrawPile = useRef<PlayerCard[]>(playerCardOrder.slice(HAND_SIZE))
+  const playerDrawPile = useRef<PlayerCard[]>(playerCardOrder)
   const playerDiscard = useRef<PlayerCard[]>([])
 
   // Sends a face-down replacement card flying from the deck into the slot the just-
   // played card vacated, then flips it face-up once it lands — mirrors the manager's
   // opening-play flight below, just reversed (deck -> hand instead of hand -> battle).
-  const startPlayerDraw = (slotIndex: number) => {
+  const startPlayerDraw = (slotIndex: number, onComplete?: () => void) => {
     if (playerDrawPile.current.length === 0) {
       playerDrawPile.current = shuffle(playerDiscard.current)
       playerDiscard.current = []
@@ -169,6 +182,7 @@ function GameBoard() {
     const destEl = handRef.current?.querySelector<HTMLElement>(`[data-slot-index="${slotIndex}"]`)
     if (!sourceEl || !destEl) {
       setHand((prev) => prev.map((c, i) => (i === slotIndex ? card : c)))
+      onComplete?.()
       return
     }
 
@@ -176,6 +190,7 @@ function GameBoard() {
     const d = destEl.getBoundingClientRect()
 
     setPlayerFlight({
+      key: ++flightKeyCounter.current,
       card,
       slotIndex,
       source: { top: s.top, left: s.left, width: s.width, height: s.height },
@@ -197,6 +212,7 @@ function GameBoard() {
         () => {
           setHand((prev) => prev.map((c, i) => (i === slotIndex ? card : c)))
           setPlayerFlight(null)
+          onComplete?.()
         },
         300 + 550 + 450,
       ),
@@ -206,7 +222,7 @@ function GameBoard() {
   // Sends a face-down card sliding from the manager's deck into the hand slot that
   // was just played from, so the manager's hand always reads as full again — it
   // never flips (the manager's cards stay hidden until actually played).
-  const startManagerDraw = (id: string) => {
+  const startManagerDraw = (id: string, onComplete?: () => void) => {
     managerDrawTimers.current.forEach((t) => clearTimeout(t))
     managerDrawTimers.current = []
 
@@ -218,6 +234,7 @@ function GameBoard() {
         next.delete(id)
         return next
       })
+      onComplete?.()
       return
     }
 
@@ -225,6 +242,7 @@ function GameBoard() {
     const d = destEl.getBoundingClientRect()
 
     setManagerDrawFlight({
+      key: ++flightKeyCounter.current,
       slotId: id,
       source: { top: s.top, left: s.left, width: s.width, height: s.height },
       dest: { top: d.top, left: d.left, width: d.width, height: d.height },
@@ -246,6 +264,7 @@ function GameBoard() {
           return next
         })
         setManagerDrawFlight(null)
+        onComplete?.()
       }, 20 + 450),
     )
   }
@@ -353,10 +372,45 @@ function GameBoard() {
     }
   }, [draggingCard])
 
+  // Deals the opening hands once the splash screen is dismissed: all six manager
+  // cards fly in first (face-down the whole way, since they stay hidden until
+  // played), then all six player cards fly in and flip face-up as they land. Each
+  // draw's completion callback kicks off the next, so the deal reads as one card at
+  // a time rather than all twelve arriving in a pile.
+  useEffect(() => {
+    if (!gameStarted) return
+
+    let cancelled = false
+
+    const dealPlayerCards = (index: number) => {
+      if (cancelled) return
+      if (index >= HAND_SIZE) {
+        setDealt(true)
+        return
+      }
+      startPlayerDraw(index, () => dealPlayerCards(index + 1))
+    }
+
+    const dealManagerCards = (index: number) => {
+      if (cancelled) return
+      if (index >= MANAGER_SLOT_IDS.length) {
+        dealPlayerCards(0)
+        return
+      }
+      startManagerDraw(MANAGER_SLOT_IDS[index], () => dealManagerCards(index + 1))
+    }
+
+    dealManagerCards(0)
+
+    return () => {
+      cancelled = true
+    }
+  }, [gameStarted])
+
   // The manager opens every round by playing a card into the top slot; the player
   // only gets to respond once it's landed (see handleDropCard).
   useEffect(() => {
-    if (!gameStarted) return
+    if (!gameStarted || !dealt) return
 
     timers.current.forEach((t) => clearTimeout(t))
     timers.current = []
@@ -412,6 +466,7 @@ function GameBoard() {
 
         setHiddenHandId(id)
         setFlight({
+          key: ++flightKeyCounter.current,
           card,
           source: { top: s.top, left: s.left, width: s.width, height: s.height },
           dest: { top: d.top, left: d.left, width: d.width, height: d.height },
@@ -447,7 +502,7 @@ function GameBoard() {
       timers.current.forEach((t) => clearTimeout(t))
       timers.current = []
     }
-  }, [roundKey, gameStarted])
+  }, [roundKey, gameStarted, dealt])
 
   // Once the player responds to the manager's card, resolve the round after the
   // sparkle-burst animation plays out.
@@ -651,7 +706,7 @@ function GameBoard() {
           <p className="side-label">Your manager</p>
           <div className="side-row">
             <div className="deck-wrap" ref={managerDeckRef}>
-              <Deck image="/cards/pc-manager-back-image.png" count={30} />
+              <Deck image="/cards/pc-manager-back-image.webp" count={30} />
             </div>
             <div className="manager-hand-wrap" ref={managerHandRef}>
               <ManagerHand ids={MANAGER_SLOT_IDS} usedIds={usedManagerIds} hiddenId={hiddenHandId} />
@@ -687,7 +742,7 @@ function GameBoard() {
         <p className="side-label">You</p>
         <div className="side-row">
           <div className="deck-wrap" ref={playerDeckRef}>
-            <Deck image="/cards/pc-player-back-image.png" count={34} />
+            <Deck image="/cards/pc-player-back-image.webp" count={34} />
           </div>
           <div className="hand-wrap" ref={handRef}>
             <Hand cards={hand} draggingCardId={draggingCard?.id ?? null} onCardPointerDown={handleCardPointerDown} />
@@ -716,6 +771,7 @@ function GameBoard() {
 
       {flight && (
         <div
+          key={flight.key}
           className="card-flight"
           style={{
             top: flight.arrived ? flight.dest.top : flight.source.top,
@@ -727,7 +783,7 @@ function GameBoard() {
           <div className={`flip-card ${flight.flipped ? 'flip-card-flipped' : ''}`}>
             <div className="flip-card-inner">
               <div className="flip-face flip-face-front">
-                <img src="/cards/pc-manager-back-image.png" alt="" draggable={false} />
+                <img src="/cards/pc-manager-back-image.webp" alt="" draggable={false} />
               </div>
               <div className="flip-face flip-face-back">
                 <Card card={flight.card} />
@@ -739,6 +795,7 @@ function GameBoard() {
 
       {playerFlight && (
         <div
+          key={playerFlight.key}
           className="card-flight"
           style={{
             top: playerFlight.arrived ? playerFlight.dest.top : playerFlight.source.top,
@@ -750,7 +807,7 @@ function GameBoard() {
           <div className={`flip-card ${playerFlight.flipped ? 'flip-card-flipped' : ''}`}>
             <div className="flip-card-inner">
               <div className="flip-face flip-face-front">
-                <img src="/cards/pc-player-back-image.png" alt="" draggable={false} />
+                <img src="/cards/pc-player-back-image.webp" alt="" draggable={false} />
               </div>
               <div className="flip-face flip-face-back">
                 <Card card={playerFlight.card} />
@@ -762,6 +819,7 @@ function GameBoard() {
 
       {managerDrawFlight && (
         <div
+          key={managerDrawFlight.key}
           className="card-flight"
           style={{
             top: managerDrawFlight.arrived ? managerDrawFlight.dest.top : managerDrawFlight.source.top,
@@ -770,7 +828,7 @@ function GameBoard() {
             height: managerDrawFlight.arrived ? managerDrawFlight.dest.height : managerDrawFlight.source.height,
           }}
         >
-          <img className="card-flight-back" src="/cards/pc-manager-back-image.png" alt="" draggable={false} />
+          <img className="card-flight-back" src="/cards/pc-manager-back-image.webp" alt="" draggable={false} />
         </div>
       )}
     </div>

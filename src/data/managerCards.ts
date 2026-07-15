@@ -15,6 +15,6 @@ export const sampleManagerCards: ManagerCard[] = Object.entries(modules).map(([p
     side: 'manager',
     ...data,
     // The JSON file and its art share a filename, so the image never needs its own field.
-    image: `/cards/manager/${id}.png`,
+    image: `/cards/manager/${id}.webp`,
   }
 })
