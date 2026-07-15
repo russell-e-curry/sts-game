@@ -50,8 +50,8 @@ interface ManagerDrawFlight {
   arrived: boolean
 }
 
-const MANAGER_SLOT_IDS = Array.from({ length: 6 }, (_, i) => `m${i}`)
-const HAND_SIZE = 6
+const MANAGER_SLOT_IDS = Array.from({ length: 5 }, (_, i) => `m${i}`)
+const HAND_SIZE = 5
 const STARTING_BURNOUT = 0
 const STAT_MAX = 500
 const BURNOUT_MAX = 1000
@@ -101,6 +101,12 @@ function GameBoard() {
   // Both hands start empty — the opening-deal effect below animates all twelve cards
   // (six manager, six player) into their slots once the splash screen is dismissed.
   const [hand, setHand] = useState<(PlayerCard | null)[]>(() => Array(HAND_SIZE).fill(null))
+  // Tracks the actual card sitting in each manager slot (index-matched to
+  // MANAGER_SLOT_IDS) so the round-start effect can pick the most damaging card in
+  // hand to play, rather than always drawing from the same slot.
+  const [managerHand, setManagerHand] = useState<(ManagerCard | null)[]>(() =>
+    Array(MANAGER_SLOT_IDS.length).fill(null),
+  )
   const [usedManagerIds, setUsedManagerIds] = useState<Set<string>>(() => new Set(MANAGER_SLOT_IDS))
   // Flips true once the opening deal finishes, gating the manager's first round-start
   // play so it can't fly a card out of a hand slot that hasn't been dealt into yet.
@@ -155,14 +161,17 @@ function GameBoard() {
   // whose deltas keep getting re-applied on every subsequent turn — not just the
   // turn it was played.
   const activeRecurringEffects = useRef<RecurringEffect[]>([])
-  // Total manager cards played so far — kept separate from usedManagerIds (which
-  // tracks which hand SLOTS are momentarily empty, and shrinks again once a slot is
-  // refilled) so the deck keeps cycling forward instead of looping the same cards.
+  // Total manager cards played so far — only used to detect the very first play (so
+  // the fat-slob opener can jump the queue), since which card plays next is now
+  // chosen from the manager's hand each round rather than by deck position.
   const managerPlayCount = useRef(0)
   // Cards not currently in hand: drawn from (shuffling the discard back in once
   // exhausted) whenever a played card's slot needs a replacement.
   const playerDrawPile = useRef<PlayerCard[]>(playerCardOrder)
   const playerDiscard = useRef<PlayerCard[]>([])
+  // Same draw-pile/discard mechanic as the player's, for the manager's hand.
+  const managerDrawPile = useRef<ManagerCard[]>(managerDeck)
+  const managerDiscard = useRef<ManagerCard[]>([])
 
   // Sends a face-down replacement card flying from the deck into the slot the just-
   // played card vacated, then flips it face-up once it lands — mirrors the manager's
@@ -223,12 +232,20 @@ function GameBoard() {
   // was just played from, so the manager's hand always reads as full again — it
   // never flips (the manager's cards stay hidden until actually played).
   const startManagerDraw = (id: string, onComplete?: () => void) => {
+    if (managerDrawPile.current.length === 0) {
+      managerDrawPile.current = shuffle(managerDiscard.current)
+      managerDiscard.current = []
+    }
+    const card = managerDrawPile.current.shift()
+    if (!card) return
+
     managerDrawTimers.current.forEach((t) => clearTimeout(t))
     managerDrawTimers.current = []
 
     const sourceEl = managerDeckRef.current
     const destEl = managerHandRef.current?.querySelector<HTMLElement>(`[data-slot-id="${id}"]`)
     if (!sourceEl || !destEl) {
+      setManagerHand((prev) => prev.map((c, i) => (MANAGER_SLOT_IDS[i] === id ? card : c)))
       setUsedManagerIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
@@ -258,6 +275,7 @@ function GameBoard() {
 
     managerDrawTimers.current.push(
       window.setTimeout(() => {
+        setManagerHand((prev) => prev.map((c, i) => (MANAGER_SLOT_IDS[i] === id ? card : c)))
         setUsedManagerIds((prev) => {
           const next = new Set(prev)
           next.delete(id)
@@ -418,8 +436,43 @@ function GameBoard() {
 
     timers.current.push(
       window.setTimeout(() => {
-        const id = MANAGER_SLOT_IDS.find((mid) => !usedManagerIds.has(mid))
-        if (!id) return
+        const hasEligiblePlayerRecurringTarget = (type: string) =>
+          activeRecurringEffects.current.some((e) => !e.stopped && e.side === 'player' && e.type === type)
+
+        const handEntries = managerHand
+          .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
+          .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
+        if (handEntries.length === 0) return
+
+        // Normalized (percent-of-max) estimate of how much playing this card would
+        // hurt the player — the higher, the more damaging. '*' and 'reset' clear a
+        // stat to 0, which only helps the player, so they're scored as improving
+        // (negative) that stat rather than raising it.
+        const damage = (c: ManagerCard) => {
+          const backlogDelta = c.action === 'reset' || c.backlog === '*' ? -backlog : (c.backlog ?? 0)
+          const technicalDebtDelta =
+            c.action === 'reset' || c.technicalDebt === '*' ? -technicalDebt : (c.technicalDebt ?? 0)
+          return (
+            backlogDelta / STAT_MAX +
+            technicalDebtDelta / STAT_MAX +
+            (c.burnout ?? 0) / BURNOUT_MAX -
+            (c.vesting ?? 0) / VESTING_MAX
+          )
+        }
+
+        // The fat-slob opener always leads off the very first round. After that, an
+        // eliminate card with something in hand eligible to eliminate takes priority
+        // over raw damage — shutting down an active player recurring card outweighs a
+        // one-off stat hit — and otherwise the manager plays whatever in hand would
+        // hurt the player most.
+        const opener =
+          managerPlayCount.current === 0 ? handEntries.find((e) => e.card.id === 'mc-coding-fat-slob') : undefined
+        const eligibleEliminate = handEntries.filter(
+          (e) => e.card.action === 'eliminate' && hasEligiblePlayerRecurringTarget(e.card.type),
+        )
+        const pool = eligibleEliminate.length > 0 ? eligibleEliminate : handEntries
+        const chosen = opener ?? pool.reduce((best, e) => (damage(e.card) > damage(best.card) ? e : best))
+        const { card, id } = chosen
 
         const sourceEl = managerHandRef.current?.querySelector(`[data-card-id="${id}"]`)
         const destEl = activeSlotRef.current
@@ -427,42 +480,6 @@ function GameBoard() {
 
         const s = sourceEl.getBoundingClientRect()
         const d = destEl.getBoundingClientRect()
-
-        const hasEligiblePlayerRecurringTarget = (type: string) =>
-          activeRecurringEffects.current.some((e) => !e.stopped && e.side === 'player' && e.type === type)
-
-        // Prioritize the nearest upcoming eliminate card that has something to
-        // eliminate, jumping ahead of whatever would normally play next — the manager
-        // would rather shut down an active player recurring card than stick to deck
-        // order. If no eligible eliminate card exists anywhere in the deck, fall back
-        // to the next card in sequence, skipping past any ineligible eliminate cards
-        // along the way (deferred, not lost — they're re-evaluated on the deck's next
-        // lap, once more of the player's recurring cards may be active).
-        let playIndex = managerPlayCount.current
-        let eliminateIndex = -1
-        for (let i = 0; i < managerDeck.length; i++) {
-          const idx = managerPlayCount.current + i
-          const candidate = managerDeck[idx % managerDeck.length]
-          if (candidate.action === 'eliminate' && hasEligiblePlayerRecurringTarget(candidate.type)) {
-            eliminateIndex = idx
-            break
-          }
-        }
-
-        if (eliminateIndex !== -1) {
-          playIndex = eliminateIndex
-        } else {
-          let skips = 0
-          while (
-            managerDeck[playIndex % managerDeck.length].action === 'eliminate' &&
-            !hasEligiblePlayerRecurringTarget(managerDeck[playIndex % managerDeck.length].type) &&
-            skips < managerDeck.length - 1
-          ) {
-            playIndex += 1
-            skips += 1
-          }
-        }
-        const card = managerDeck[playIndex % managerDeck.length]
 
         setHiddenHandId(id)
         setFlight({
@@ -486,7 +503,9 @@ function GameBoard() {
           window.setTimeout(
             () => {
               setActiveManagerCard(card)
-              managerPlayCount.current = playIndex + 1
+              managerPlayCount.current += 1
+              managerDiscard.current.push(card)
+              setManagerHand((prev) => prev.map((c, i) => (MANAGER_SLOT_IDS[i] === id ? null : c)))
               setUsedManagerIds((prev) => new Set(prev).add(id))
               setHiddenHandId(null)
               setFlight(null)
@@ -502,6 +521,11 @@ function GameBoard() {
       timers.current.forEach((t) => clearTimeout(t))
       timers.current = []
     }
+    // managerHand/backlog/technicalDebt/usedManagerIds are deliberately read via
+    // closure rather than listed here — this effect should only re-fire on an actual
+    // new round, each time picking up whatever those are at that moment (always
+    // settled by then: the previous round's slot refill finishes well before the next
+    // round starts).
   }, [roundKey, gameStarted, dealt])
 
   // Once the player responds to the manager's card, resolve the round after the
@@ -698,7 +722,7 @@ function GameBoard() {
   }, [activePlayerCard, activeManagerCard])
 
   return (
-    <div className="game-board">
+    <div className={`game-board${draggingCard ? ' game-board-dragging' : ''}`}>
       {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
 
       <div className="top-bar">

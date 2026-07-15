@@ -8,13 +8,13 @@ const modules = import.meta.glob<CardJson>('./cardContent/manager/*.json', {
   import: 'default',
 })
 
-export const sampleManagerCards: ManagerCard[] = Object.entries(modules).map(([path, data]) => {
+export const sampleManagerCards: ManagerCard[] = Object.entries(modules).flatMap(([path, data]) => {
   const id = path.split('/').pop()!.replace(/\.json$/, '')
-  return {
-    id,
-    side: 'manager',
+  return Array.from({ length: data.count ?? 1 }, (_, i) => ({
+    id: i === 0 ? id : `${id}#${i + 1}`,
+    side: 'manager' as const,
     ...data,
     // The JSON file and its art share a filename, so the image never needs its own field.
     image: `/cards/manager/${id}.webp`,
-  }
+  }))
 })

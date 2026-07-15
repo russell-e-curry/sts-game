@@ -50,12 +50,16 @@
   gap: 16px;
 }
 
+/* Grows to take all leftover row width (same as before) but shrinks reluctantly
+   (shrink: 0.4, well below .hud's default 1) and off a non-zero basis, so on a
+   cramped window .hud gives up its width first instead of the manager's cards
+   getting crushed under an aspect-ratio-breaking min-width: 0. */
 .top-bar-manager {
-  flex: 1;
+  flex: 1 0.4 480px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
+  min-width: 360px;
   min-height: 0;
 }
 
@@ -113,14 +117,17 @@
 }
 
 /* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full row
-   height, same as .ad-slot beside it. */
+   height, same as .ad-slot beside it. Never grows past its 420px basis (leftover
+   row width always goes to .top-bar-manager instead, see above) and shrinks freely
+   toward a 200px floor — the meter bars read fine narrower since their type is
+   sized off the panel's height (cqh) rather than its width. */
 .hud {
-  flex: 0 1 640px;
+  flex: 0 1 420px;
   align-self: stretch;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  min-width: 0;
+  min-width: 200px;
 }
 
 .hud-panel {
@@ -157,6 +164,14 @@
   position: fixed;
   pointer-events: none;
   z-index: 1000;
+}
+
+/* The drag ghost above is pointer-events: none, so without this the browser keeps
+   delivering real mouseenter/mouseleave to whatever card is underneath it as it moves
+   — spuriously hover-enlarging cards elsewhere in the hand or battle area while the
+   player is just dragging over them, not actually pointing at them. */
+.game-board-dragging .game-card {
+  pointer-events: none;
 }
 
 .drag-ghost .game-card {

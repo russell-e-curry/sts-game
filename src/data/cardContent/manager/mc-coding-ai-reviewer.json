@@ -1,0 +1,8 @@
+{
+  "title": "AI Code Reviewer",
+  "type": "coding",
+  "action": "recurring",
+  "description": "Your dipshit CTO creates an AI agent to review your code, it mostly generates recipies for szechuan dishes - but that's your problem.",
+  "backlog": 25,
+  "burnout": 10
+}

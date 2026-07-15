@@ -13,4 +13,6 @@ export interface CardJson {
   burnout?: number
   /** Signed percentage delta applied to vesting. Omit if this card doesn't touch it. */
   vesting?: number
+  /** Number of copies of this card included in the deck. Defaults to 1 if omitted. */
+  count?: number
 }

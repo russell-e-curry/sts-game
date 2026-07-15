@@ -31,5 +31,40 @@
     "character": "CMO",
     "text": "Sent the newsletter to the wrong list again, no one noticed though.",
     "burnout": 5
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "CMO",
+        "text": "I was just watching a TikTok on the subway. Are we doing anything with Generative AI? We need a \"Powered by AI\" banner on the landing page by Friday. Doesn't need to do anything, just glow and look cool."
+      },
+      {
+        "character": "VP",
+        "text": "Love this. Glowing AI banner. Very now."
+      },
+      {
+        "character": "PM",
+        "text": "Just to clarify, you want a badge that says AI but isn't connected to any AI?"
+      },
+      {
+        "character": "CMO",
+        "text": "Connected to AI is a Q3 problem. Glowing is a Friday problem."
+      },
+      {
+        "character": "VP",
+        "text": "Can we make it glow harder than the competitor's banner? I feel like theirs glows more."
+      },
+      {
+        "character": "CMO",
+        "text": "Ooh, and can it say \"AI\" but like, shimmer? Shimmer reads as smarter."
+      },
+      {
+        "character": "PM",
+        "text": "Shimmer reads as smarter. Got it. I'll get the team right on it.",
+        "backlog": 25,
+        "techDebt": 25
+      }
+    ]
   }
 ]
