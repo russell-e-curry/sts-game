@@ -12,16 +12,22 @@
 }
 
 /* Height is the fixed dimension (100% of the row, which is always a definite size
-   from the flex layout above) and width is derived from it via aspect-ratio, capped
-   at an ideal viewport-relative width so slots don't get absurdly wide when there
-   are only a couple of cards. Deriving width FROM height (rather than the other way
-   around, with height merely capped) guarantees the card is always exactly as tall
-   as its row and keeps the 5:7 playing-card proportions intact. */
+   from the flex layout above, or the vw-based bound below on a wide-but-short
+   window) and width is left auto so it's always derived from height via
+   aspect-ratio — this guarantees the card keeps its 5:7 playing-card proportions at
+   every size. The viewport-relative cap (so slots don't get absurdly wide when
+   there are only a couple of cards) has to land on height, not width: an explicit
+   height alongside a max-width would let max-width clip the width down without
+   aspect-ratio pulling height down to match, since aspect-ratio only ever fills in
+   whichever dimension is auto — that combination is what previously left narrow
+   windows with tall, skinny card slots (and everything sized in cqw inside them,
+   including the card badges, scaled to that skinny width instead of the actual
+   box). Converting the vw bound through the aspect ratio and applying it to height
+   keeps width the one truly-derived dimension, so the ratio can't break. */
 .hand-slot {
   flex: 0 1 auto;
   min-width: 0;
-  height: 100%;
-  max-width: 12vw;
+  height: min(100%, calc(12vw * 7 / 5));
   aspect-ratio: 5 / 7;
   box-sizing: border-box;
   display: flex;

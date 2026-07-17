@@ -1,0 +1,131 @@
+/* Positioned/sized exactly like .card-flight (see GameBoard.css) — fixed over the
+   hand slot the discarded card just vacated — but never moves; it only dissolves in
+   place before GameBoard starts the replacement draw. */
+.disintegrate-effect {
+  position: fixed;
+  pointer-events: none;
+  z-index: 900;
+}
+
+.disintegrate-card {
+  width: 100%;
+  height: 100%;
+  animation: disintegrate-card 0.65s ease-in forwards;
+}
+
+.disintegrate-card .game-card {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes disintegrate-card {
+  0% {
+    opacity: 1;
+    filter: blur(0) brightness(1);
+    transform: scale(1) translateY(0);
+  }
+  40% {
+    opacity: 0.8;
+    filter: blur(1px) brightness(1.2);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(7px) brightness(1.5);
+    transform: scale(0.85) translateY(-18px);
+  }
+}
+
+.ash-mote {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(220, 190, 255, 0.95), rgba(122, 31, 214, 0.2));
+  opacity: 0;
+  animation: ash-mote 0.65s ease-out forwards;
+}
+
+.ash-mote-1 {
+  top: 20%;
+  left: 15%;
+  --dx: -14px;
+  --dy: -46px;
+  animation-delay: 0.03s;
+}
+.ash-mote-2 {
+  top: 30%;
+  left: 45%;
+  --dx: 6px;
+  --dy: -54px;
+  animation-delay: 0.09s;
+}
+.ash-mote-3 {
+  top: 15%;
+  left: 75%;
+  --dx: 16px;
+  --dy: -42px;
+  animation-delay: 0.02s;
+}
+.ash-mote-4 {
+  top: 50%;
+  left: 8%;
+  --dx: -20px;
+  --dy: -34px;
+  animation-delay: 0.14s;
+}
+.ash-mote-5 {
+  top: 55%;
+  left: 55%;
+  --dx: 10px;
+  --dy: -50px;
+  animation-delay: 0.06s;
+}
+.ash-mote-6 {
+  top: 45%;
+  left: 88%;
+  --dx: 18px;
+  --dy: -38px;
+  animation-delay: 0.18s;
+}
+.ash-mote-7 {
+  top: 70%;
+  left: 25%;
+  --dx: -10px;
+  --dy: -40px;
+  animation-delay: 0.11s;
+}
+.ash-mote-8 {
+  top: 75%;
+  left: 65%;
+  --dx: 12px;
+  --dy: -46px;
+  animation-delay: 0.2s;
+}
+.ash-mote-9 {
+  top: 85%;
+  left: 40%;
+  --dx: -6px;
+  --dy: -36px;
+  animation-delay: 0.08s;
+}
+.ash-mote-10 {
+  top: 5%;
+  left: 55%;
+  --dx: 4px;
+  --dy: -48px;
+  animation-delay: 0.16s;
+}
+
+@keyframes ash-mote {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(1);
+  }
+}

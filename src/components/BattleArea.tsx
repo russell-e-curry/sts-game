@@ -223,7 +223,9 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
               <SparkleBurst />
             </>
           ) : (
-            <div className="battle-slot-placeholder" />
+            <div className="battle-slot-placeholder battle-slot-placeholder-player">
+              <p className="battle-slot-placeholder-label">Play a Card</p>
+            </div>
           )}
         </div>
       </div>

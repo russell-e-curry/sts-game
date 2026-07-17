@@ -10,8 +10,10 @@ import Meters from './Meters'
 import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
+import DisintegrateEffect from './DisintegrateEffect'
 import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
 import SplashScreen from './SplashScreen'
+import GameOverScreen from './GameOverScreen'
 import { allSlackItems, isSlackConversation, CHANNEL_ORDER } from '../data/slackChannels'
 import type { SlackMessageJson } from '../data/slackMessages/schema'
 import './GameBoard.css'
@@ -42,6 +44,12 @@ interface PlayerFlight {
   arrived: boolean
 }
 
+interface DiscardEffect {
+  key: number
+  card: PlayerCard
+  rect: Rect
+}
+
 interface ManagerDrawFlight {
   key: number
   slotId: string
@@ -64,6 +72,9 @@ const PLAYER_FLIP_DEFAULT_DURATION_MS = 450
 // Gap between the card's flip animation starting and its flip sound actually
 // playing, so the two read as sound-following-motion rather than simultaneous.
 const PLAYER_FLIP_SOUND_DELAY_MS = 200
+// Matches .disintegrate-card's CSS animation duration (see DisintegrateEffect.css) —
+// how long a discarded card dissolves before its replacement starts drawing in.
+const DISCARD_DISINTEGRATE_DURATION_MS = 650
 const HAND_SIZE = 5
 const STARTING_BURNOUT = 0
 const STAT_MAX = 500
@@ -125,14 +136,28 @@ function GameBoard() {
   const [flight, setFlight] = useState<Flight | null>(null)
   const [playerFlight, setPlayerFlight] = useState<PlayerFlight | null>(null)
   const [managerDrawFlight, setManagerDrawFlight] = useState<ManagerDrawFlight | null>(null)
+  const [discardEffect, setDiscardEffect] = useState<DiscardEffect | null>(null)
   const [backlog, setBacklog] = useState(0)
   const [technicalDebt, setTechnicalDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
   const [vesting, setVesting] = useState(0)
   const [roundKey, setRoundKey] = useState(0)
+  // Set once backlog/technical debt/burnout hits its cap (lose) or vesting hits 100%
+  // (win) — see the effect below. Also gates the round-start effect so the manager
+  // stops playing cards once the game has ended.
+  const [gameOver, setGameOver] = useState<'win' | 'lose' | null>(null)
   // Gates the round-start effect below so the manager doesn't play its opening card
   // until the player has dismissed the splash screen.
   const [gameStarted, setGameStarted] = useState(false)
+  // Bumped by startNewGame (see below) so the opening-deal effect re-runs on a replay
+  // even though gameStarted itself never flips back to false — it stays true the whole
+  // time so the main splash screen doesn't reappear after a win/loss.
+  const [gameKey, setGameKey] = useState(0)
+  // Gates the opening-deal effect below so it can't fire before the window has
+  // finished loading (fonts, images, etc.) — starting it too early risks the very
+  // first flight's source/dest rects being measured mid-layout-shift, which reads as
+  // that card skipping its flight and just appearing already in the hand/manager row.
+  const [pageLoaded, setPageLoaded] = useState(() => document.readyState === 'complete')
   // Measured width of the manager's deck + hand (see the ResizeObserver effect below)
   // — applied to .top-bar-manager directly, since CSS shrink-to-fit doesn't reliably
   // see through the nested flex layers between .top-bar-manager and the actual hand
@@ -170,6 +195,7 @@ function GameBoard() {
   const timers = useRef<number[]>([])
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
+  const discardTimers = useRef<number[]>([])
   const roundCounter = useRef(0)
   // Gives every flight (manager play, player draw, manager draw) a unique React key
   // so back-to-back flights — as when the opening deal chains six draws in a row —
@@ -379,6 +405,8 @@ function GameBoard() {
       playerDrawTimers.current = []
       managerDrawTimers.current.forEach((t) => clearTimeout(t))
       managerDrawTimers.current = []
+      discardTimers.current.forEach((t) => clearTimeout(t))
+      discardTimers.current = []
       conversationTimers.current.forEach((t) => clearTimeout(t))
       conversationTimers.current = []
     }
@@ -403,6 +431,13 @@ function GameBoard() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (pageLoaded) return
+    const handleLoad = () => setPageLoaded(true)
+    window.addEventListener('load', handleLoad)
+    return () => window.removeEventListener('load', handleLoad)
+  }, [pageLoaded])
 
   // .deck-wrap and .manager-hand-wrap both size themselves to their own content (see
   // GameBoard.css/ManagerHand.css) regardless of what .top-bar-manager does, so their
@@ -434,6 +469,93 @@ function GameBoard() {
     startPlayerDraw(slotIndex)
   }
 
+  // Drops a card onto .discard-zone instead of playing it: no manager response, no
+  // round resolution — the original slot empties immediately and the card dissolves
+  // inside the discard slot itself (see DisintegrateEffect), then a fresh one is
+  // drawn into the vacated slot once the dissolve finishes.
+  const handleDiscardCard = (cardId: string) => {
+    if (activePlayerCard) return
+    const slotIndex = hand.findIndex((c) => c?.id === cardId)
+    if (slotIndex === -1) return
+    const card = hand[slotIndex]!
+    const discardEl = handRef.current?.querySelector<HTMLElement>('.discard-zone')
+    const rect = discardEl?.getBoundingClientRect()
+
+    setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
+    playerDiscard.current.push(card)
+    playSound('pc-action-discard-card')
+
+    if (!rect) {
+      startPlayerDraw(slotIndex)
+      return
+    }
+
+    discardTimers.current.forEach((t) => clearTimeout(t))
+    discardTimers.current = []
+
+    setDiscardEffect({
+      key: ++flightKeyCounter.current,
+      card,
+      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+    })
+
+    discardTimers.current.push(
+      window.setTimeout(() => {
+        setDiscardEffect(null)
+        startPlayerDraw(slotIndex)
+      }, DISCARD_DISINTEGRATE_DURATION_MS),
+    )
+  }
+
+  // Resets every piece of round/game state back to a fresh game — used by the
+  // game-over screen's replay button instead of a page reload so gameStarted stays
+  // true and the main splash screen doesn't reappear.
+  const startNewGame = () => {
+    timers.current.forEach((t) => clearTimeout(t))
+    timers.current = []
+    playerDrawTimers.current.forEach((t) => clearTimeout(t))
+    playerDrawTimers.current = []
+    managerDrawTimers.current.forEach((t) => clearTimeout(t))
+    managerDrawTimers.current = []
+    discardTimers.current.forEach((t) => clearTimeout(t))
+    discardTimers.current = []
+    conversationTimers.current.forEach((t) => clearTimeout(t))
+    conversationTimers.current = []
+
+    managerDrawPile.current = shuffle(sampleManagerCards)
+    managerDiscard.current = []
+    playerDrawPile.current = shuffle(sampleHand)
+    playerDiscard.current = []
+    activeRecurringEffects.current = []
+    usedSlackItems.current = new Set()
+    conversationInProgress.current = false
+    roundCounter.current = 0
+    slackMessageCounter.current = 0
+
+    setHand(Array(HAND_SIZE).fill(null))
+    setManagerHand(Array(MANAGER_SLOT_IDS.length).fill(null))
+    setUsedManagerIds(new Set(MANAGER_SLOT_IDS))
+    setDealt(false)
+    setHiddenHandId(null)
+    setHistory([])
+    setActivePlayerCard(null)
+    setActiveManagerCard(null)
+    setFlight(null)
+    setPlayerFlight(null)
+    setManagerDrawFlight(null)
+    setDiscardEffect(null)
+    setBacklog(0)
+    setTechnicalDebt(0)
+    setBurnout(STARTING_BURNOUT)
+    setVesting(0)
+    setRoundKey(0)
+    setGameOver(null)
+    setSlackMessages([])
+    setActiveSlackChannel(CHANNEL_ORDER[0])
+    setDraggingCard(null)
+    setGameKey((k) => k + 1)
+  }
+
   const handleCardPointerDown = (e: PointerEvent, card: PlayerCard) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     dragInfo.current = {
@@ -451,8 +573,12 @@ function GameBoard() {
 
     const handleMove = (e: globalThis.PointerEvent) => setPos({ x: e.clientX, y: e.clientY })
     const handleUp = (e: globalThis.PointerEvent) => {
-      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.history-panel, .active-column')
-      if (target) handleDropCard(draggingCard.id)
+      const dropped = document.elementFromPoint(e.clientX, e.clientY)
+      if (dropped?.closest('.discard-zone')) {
+        handleDiscardCard(draggingCard.id)
+      } else if (dropped?.closest('.history-panel, .active-column')) {
+        handleDropCard(draggingCard.id)
+      }
       setDraggingCard(null)
     }
 
@@ -464,13 +590,13 @@ function GameBoard() {
     }
   }, [draggingCard])
 
-  // Deals the opening hands once the splash screen is dismissed: all six manager
-  // cards fly in first (face-down the whole way, since they stay hidden until
-  // played), then all six player cards fly in and flip face-up as they land. Each
-  // draw's completion callback kicks off the next, so the deal reads as one card at
-  // a time rather than all twelve arriving in a pile.
+  // Deals the opening hands once the splash screen is dismissed AND the window has
+  // finished loading: all six manager cards fly in first (face-down the whole way,
+  // since they stay hidden until played), then all six player cards fly in and flip
+  // face-up as they land. Each draw's completion callback kicks off the next, so the
+  // deal reads as one card at a time rather than all twelve arriving in a pile.
   useEffect(() => {
-    if (!gameStarted) return
+    if (!gameStarted || !pageLoaded) return
 
     let cancelled = false
 
@@ -497,12 +623,25 @@ function GameBoard() {
     return () => {
       cancelled = true
     }
-  }, [gameStarted])
+  }, [gameStarted, pageLoaded, gameKey])
+
+  // Ends the game the moment any losing stat maxes out (backlog/technical debt/
+  // burnout) or vesting reaches 100% — checked as a reaction to the stats themselves
+  // rather than inline in the resolve effect above, so it also catches Slack messages
+  // pushing a stat over the line outside a round's own resolution.
+  useEffect(() => {
+    if (gameOver) return
+    if (backlog >= STAT_MAX || technicalDebt >= STAT_MAX || burnout >= BURNOUT_MAX) {
+      setGameOver('lose')
+    } else if (vesting >= VESTING_MAX) {
+      setGameOver('win')
+    }
+  }, [backlog, technicalDebt, burnout, vesting, gameOver])
 
   // The manager opens every round by playing a card into the top slot; the player
   // only gets to respond once it's landed (see handleDropCard).
   useEffect(() => {
-    if (!gameStarted || !dealt) return
+    if (!gameStarted || !dealt || gameOver) return
 
     timers.current.forEach((t) => clearTimeout(t))
     timers.current = []
@@ -599,7 +738,7 @@ function GameBoard() {
     // new round, each time picking up whatever those are at that moment (always
     // settled by then: the previous round's slot refill finishes well before the next
     // round starts).
-  }, [roundKey, gameStarted, dealt])
+  }, [roundKey, gameStarted, dealt, gameOver])
 
   // Once the player responds to the manager's card, resolve the round after the
   // sparkle-burst animation plays out.
@@ -814,6 +953,7 @@ function GameBoard() {
   return (
     <div className={`game-board${draggingCard ? ' game-board-dragging' : ''}`}>
       {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
+      {gameOver && <GameOverScreen result={gameOver} onRestart={startNewGame} />}
 
       <div className="top-bar">
         <div
@@ -931,6 +1071,10 @@ function GameBoard() {
             </div>
           </div>
         </div>
+      )}
+
+      {discardEffect && (
+        <DisintegrateEffect key={discardEffect.key} card={discardEffect.card} rect={discardEffect.rect} />
       )}
 
       {managerDrawFlight && (

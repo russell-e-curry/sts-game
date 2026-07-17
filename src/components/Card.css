@@ -151,6 +151,16 @@
   flex-direction: column;
   gap: 4cqw;
   box-sizing: border-box;
+  /* :root sets a percentage line-height (see index.css), which computes to a fixed
+     absolute px value there and gets inherited as that same fixed px by every
+     descendant — it doesn't rescale with these elements' own cqw-based font sizes.
+     At the small font sizes a shrunk card produces (e.g. a short viewport), that
+     fixed line-height stayed much taller than the text itself, ballooning the
+     badges/stat pills/header labels well past their font size. A unitless
+     line-height here inherits as a MULTIPLIER instead, so every descendant
+     recomputes it against its own font size — .game-card-rules already did this
+     itself (see below); this covers everything else in the template that didn't. */
+  line-height: 1.2;
 }
 
 /* Recurring cards get a light silver face instead of the usual dark one; the

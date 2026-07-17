@@ -1,0 +1,113 @@
+.game-over-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  box-sizing: border-box;
+  background: rgba(13, 14, 19, 0.97);
+}
+
+.game-over-screen-win {
+  background:
+    radial-gradient(ellipse at top, rgba(212, 160, 23, 0.35), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(255, 215, 106, 0.15), transparent 60%),
+    rgba(13, 14, 19, 0.97);
+}
+
+.game-over-screen-lose {
+  background:
+    radial-gradient(ellipse at top, rgba(200, 30, 30, 0.35), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(255, 107, 91, 0.15), transparent 60%),
+    rgba(13, 14, 19, 0.97);
+}
+
+.game-over-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 760px;
+  text-align: center;
+  gap: 20px;
+}
+
+.game-over-image {
+  max-width: 720px;
+  max-height: min(520px, 46vh);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.game-over-image:not([src]),
+.game-over-image[src=''] {
+  display: none;
+}
+
+.game-over-title {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.game-over-screen-win .game-over-title {
+  color: #ffd76a;
+  text-shadow: 0 0 20px rgba(212, 160, 23, 0.6);
+}
+
+.game-over-screen-lose .game-over-title {
+  color: #ff9c8f;
+  text-shadow: 0 0 20px rgba(200, 30, 30, 0.6);
+}
+
+.game-over-subtitle {
+  margin: 0;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+}
+
+.game-over-restart {
+  flex-shrink: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #fff;
+  border: 1px solid var(--border-accent);
+  border-radius: 16px;
+  padding: 16px 64px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.game-over-screen-win .game-over-restart {
+  background: linear-gradient(135deg, #ffd76a, #d4a017);
+  box-shadow: 0 0 32px rgba(212, 160, 23, 0.5);
+}
+
+.game-over-screen-lose .game-over-restart {
+  background: linear-gradient(135deg, #ff6b5b, #c81e1e);
+  box-shadow: 0 0 32px rgba(200, 30, 30, 0.5);
+}
+
+.game-over-restart:hover {
+  transform: scale(1.05);
+}
+
+.game-over-screen-win .game-over-restart:hover {
+  box-shadow: 0 0 44px rgba(212, 160, 23, 0.7);
+}
+
+.game-over-screen-lose .game-over-restart:hover {
+  box-shadow: 0 0 44px rgba(200, 30, 30, 0.7);
+}
+
+.game-over-restart:active {
+  transform: scale(0.98);
+}
