@@ -868,7 +868,7 @@ function GameBoard() {
 
       <div className="game-credit">
         <p className="game-credit-title">Slay the Sprint</p>
-        <p className="game-credit-copyright">Copyright (c) 2026, Russell Curry, All Rights Reserved</p>
+        <p className="game-credit-copyright">Copyright (c) 2026, All Rights Reserved</p>
       </div>
 
       {draggingCard && (
