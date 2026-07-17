@@ -3,6 +3,7 @@ import type { ManagerCard, PlayerCard } from '../types'
 import { sampleHand } from '../data/cards'
 import { sampleManagerCards } from '../data/managerCards'
 import { shuffle } from '../lib/shuffle'
+import { playSound, getSoundDurationMs } from '../lib/sounds'
 import Deck from './Deck'
 import ManagerHand from './ManagerHand'
 import Meters from './Meters'
@@ -47,9 +48,22 @@ interface ManagerDrawFlight {
   source: Rect
   dest: Rect
   arrived: boolean
+  /** How long the flight's slide takes, matching mc-action-draw-card's actual
+   * playback length (see the ref below) so the animation doesn't finish well before
+   * or after its sound. */
+  durationMs: number
 }
 
 const MANAGER_SLOT_IDS = Array.from({ length: 5 }, (_, i) => `m${i}`)
+// Matches .card-flight's CSS transition duration — used until mc-action-draw-card's
+// actual length loads (see the ref below), and again if it never does.
+const MANAGER_DRAW_DEFAULT_DURATION_MS = 450
+// Same idea, for how long to let pc-action-flip-card play before starting
+// pc-action-draw-card after it, so the two don't overlap.
+const PLAYER_FLIP_DEFAULT_DURATION_MS = 450
+// Gap between the card's flip animation starting and its flip sound actually
+// playing, so the two read as sound-following-motion rather than simultaneous.
+const PLAYER_FLIP_SOUND_DELAY_MS = 200
 const HAND_SIZE = 5
 const STARTING_BURNOUT = 0
 const STAT_MAX = 500
@@ -142,6 +156,13 @@ function GameBoard() {
   const dragInfo = useRef({ offsetX: 0, offsetY: 0, width: 150, height: 210 })
 
   const managerHandRef = useRef<HTMLDivElement>(null)
+  // Loaded once on mount (see the effect below) so every draw for the rest of the
+  // game uses the real value straight away — read via a ref rather than state since
+  // startManagerDraw needs it synchronously and doesn't itself need to re-render
+  // when it updates.
+  const managerDrawDurationRef = useRef(MANAGER_DRAW_DEFAULT_DURATION_MS)
+  // Same idea as managerDrawDurationRef, for pc-action-flip-card's length.
+  const playerFlipDurationRef = useRef(PLAYER_FLIP_DEFAULT_DURATION_MS)
   const activeSlotRef = useRef<HTMLDivElement>(null)
   const playerDeckRef = useRef<HTMLDivElement>(null)
   const managerDeckRef = useRef<HTMLDivElement>(null)
@@ -203,11 +224,27 @@ function GameBoard() {
     })
 
     playerDrawTimers.current.push(
-      window.setTimeout(() => setPlayerFlight((f) => (f ? { ...f, flipped: true } : f)), 300),
+      window.setTimeout(() => {
+        setPlayerFlight((f) => (f ? { ...f, flipped: true } : f))
+      }, 300),
     )
 
     playerDrawTimers.current.push(
-      window.setTimeout(() => setPlayerFlight((f) => (f ? { ...f, arrived: true } : f)), 300 + 550),
+      window.setTimeout(() => {
+        playSound('pc-action-flip-card')
+        // Waits out the flip sound's own length before starting the draw sound, so
+        // the two don't play over each other.
+        playerDrawTimers.current.push(
+          window.setTimeout(() => playSound('pc-action-draw-card'), playerFlipDurationRef.current),
+        )
+      }, 300 + PLAYER_FLIP_SOUND_DELAY_MS),
+    )
+
+    playerDrawTimers.current.push(
+      window.setTimeout(
+        () => setPlayerFlight((f) => (f ? { ...f, arrived: true } : f)),
+        300 + PLAYER_FLIP_SOUND_DELAY_MS + 550,
+      ),
     )
 
     playerDrawTimers.current.push(
@@ -217,7 +254,7 @@ function GameBoard() {
           setPlayerFlight(null)
           onComplete?.()
         },
-        300 + 550 + 450,
+        300 + PLAYER_FLIP_SOUND_DELAY_MS + 550 + 450,
       ),
     )
   }
@@ -251,6 +288,7 @@ function GameBoard() {
 
     const s = sourceEl.getBoundingClientRect()
     const d = destEl.getBoundingClientRect()
+    const durationMs = managerDrawDurationRef.current
 
     setManagerDrawFlight({
       key: ++flightKeyCounter.current,
@@ -258,7 +296,9 @@ function GameBoard() {
       source: { top: s.top, left: s.left, width: s.width, height: s.height },
       dest: { top: d.top, left: d.left, width: d.width, height: d.height },
       arrived: false,
+      durationMs,
     })
+    playSound('mc-action-draw-card')
 
     // One tick to paint the starting position before transitioning to the slot,
     // otherwise React can batch both states into a single render and skip the
@@ -277,7 +317,7 @@ function GameBoard() {
         })
         setManagerDrawFlight(null)
         onComplete?.()
-      }, 20 + 450),
+      }, 20 + durationMs),
     )
   }
 
@@ -307,6 +347,7 @@ function GameBoard() {
       },
     ])
     setActiveSlackChannel(channel)
+    playSound('gm-action-slack-message')
   }
 
   // Plays a conversation's messages out one at a time, 1-10s apart, applying each
@@ -340,6 +381,26 @@ function GameBoard() {
       managerDrawTimers.current = []
       conversationTimers.current.forEach((t) => clearTimeout(t))
       conversationTimers.current = []
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getSoundDurationMs('mc-action-draw-card').then((ms) => {
+      if (!cancelled && ms != null) managerDrawDurationRef.current = ms
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getSoundDurationMs('pc-action-flip-card').then((ms) => {
+      if (!cancelled && ms != null) playerFlipDurationRef.current = ms
+    })
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -502,7 +563,10 @@ function GameBoard() {
         })
 
         timers.current.push(
-          window.setTimeout(() => setFlight((f) => (f ? { ...f, flipped: true } : f)), 300),
+          window.setTimeout(() => {
+            setFlight((f) => (f ? { ...f, flipped: true } : f))
+            playSound('mc-action-flip-card')
+          }, 300),
         )
 
         timers.current.push(
@@ -878,6 +942,9 @@ function GameBoard() {
             left: managerDrawFlight.arrived ? managerDrawFlight.dest.left : managerDrawFlight.source.left,
             width: managerDrawFlight.arrived ? managerDrawFlight.dest.width : managerDrawFlight.source.width,
             height: managerDrawFlight.arrived ? managerDrawFlight.dest.height : managerDrawFlight.source.height,
+            // Overrides .card-flight's fixed CSS transition-duration so the slide
+            // takes exactly as long as mc-action-draw-card's sound.
+            transitionDuration: `${managerDrawFlight.durationMs}ms`,
           }}
         >
           <img className="card-flight-back" src="/cards/pc-manager-back-image.webp" alt="" draggable={false} />
