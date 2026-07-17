@@ -1,0 +1,7 @@
+{
+  "title": "Not in the Roadmap",
+  "type": "coding",
+  "action": "blocking",
+  "description": "Your boss forgot to add this to the roadmap, block the card he just played.",
+  "burnout" : -25
+}

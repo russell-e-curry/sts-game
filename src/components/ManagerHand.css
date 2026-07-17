@@ -1,5 +1,7 @@
+/* No width: 100% — that only resolves against a definite parent width, and
+   .top-bar-manager (see GameBoard.css) now sizes itself to fit this row rather than
+   the other way around. Left unset, this sizes naturally to its 5 slots. */
 .manager-hand {
-  width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
@@ -8,16 +10,19 @@
   padding: 0 8px;
   box-sizing: border-box;
   min-height: 0;
-  min-width: 0;
 }
 
 /* Matches the player hand: height is the fixed dimension (100% of the row, always
    definite from the flex layout above) and width is derived from it via aspect-ratio,
    capped at an ideal viewport-relative width. Deriving width FROM height guarantees
-   the card is always exactly as tall as its row and keeps 5:7 proportions intact. */
+   the card is always exactly as tall as its row and keeps 5:7 proportions intact.
+   flex-shrink: 0 (flex: 0 0 auto) so a slot never gets squeezed smaller than that —
+   without it, a container that's sizing itself to fit this row (see .top-bar-manager
+   in GameBoard.css) can't tell how wide the row actually needs to be, and the slots
+   collapse instead of the container growing to fit them. Empty and filled slots are
+   the same size either way, so dealing a card into a slot never resizes anything. */
 .manager-hand-slot {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   height: 100%;
   max-width: 12vw;
   aspect-ratio: 5 / 7;

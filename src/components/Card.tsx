@@ -14,13 +14,15 @@ interface CardProps<T extends GameCard> {
   played?: boolean
   /** True once an 'eliminate' card of the same type has stopped this recurring card — renders a striped overlay and suppresses the recurring glow. */
   stopped?: boolean
+  /** True once a 'cancel' card played the same round has neutralized this card — renders a striped overlay, same idea as `stopped` but from a same-round cancel rather than a later-round eliminate. */
+  cancelled?: boolean
   onPointerDown?: (e: PointerEvent, card: T) => void
 }
 
 // Every card enlarges to the same absolute size, pinned to what a played (battle-slot)
 // card looks like at this zoom level — a .battle-slot is always in the DOM to measure
 // against — so a hand card and a battle card reach the exact same on-screen size.
-const HOVER_SCALE = 2.35
+const HOVER_SCALE = 2.5
 // Enlarged cards are taller than the resting 1.4 ratio: the enlarged art frame is a
 // full-width square (so the square artwork fills it), which needs extra height on top
 // of the header/name/description/footer. Every enlarged card uses this same ratio, so
@@ -41,6 +43,7 @@ function Card<T extends GameCard>({
   forceExpanded,
   played,
   stopped,
+  cancelled,
   onPointerDown,
 }: CardProps<T>) {
   const [hovered, setHovered] = useState(false)
@@ -160,7 +163,7 @@ function Card<T extends GameCard>({
   return (
     <div
       ref={rootRef}
-      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped ? ' game-card-recurring' : ''}`}
+      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !cancelled ? ' game-card-recurring' : ''}`}
       style={style}
       onPointerDown={onPointerDown ? (e) => onPointerDown(e, card) : undefined}
       onMouseEnter={handleMouseEnter}
@@ -191,7 +194,7 @@ function Card<T extends GameCard>({
             {card.description}
           </p>
         </div>
-        {card.action !== 'reset' && (
+        {card.action !== 'reset' && card.action !== 'cancel' && (
           <div className="game-card-footer">
             {card.type === 'reversal' ? (
               <span className="game-card-stat game-card-stat-slot-center game-card-stat-color-vesting">
@@ -199,11 +202,7 @@ function Card<T extends GameCard>({
               </span>
             ) : (
               <>
-                {card.type === 'options' && card.vesting !== undefined ? (
-                  <span className="game-card-stat game-card-stat-slot-left game-card-stat-color-vesting">
-                    Vesting {card.vesting}%
-                  </span>
-                ) : card.backlog !== undefined ? (
+                {card.backlog !== undefined ? (
                   <span
                     className={`game-card-stat game-card-stat-slot-left ${card.backlog === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-backlog'}`}
                   >
@@ -215,8 +214,12 @@ function Card<T extends GameCard>({
                   >
                     Tech Debt {card.technicalDebt === '*' ? 'Reset' : card.technicalDebt}
                   </span>
+                ) : card.vesting !== undefined && card.burnout !== undefined ? (
+                  <span className="game-card-stat game-card-stat-slot-left game-card-stat-color-vesting">
+                    Vesting {card.vesting}%
+                  </span>
                 ) : null}
-                {card.type !== 'options' && card.vesting !== undefined && (
+                {card.vesting !== undefined && card.burnout === undefined && (
                   <span className="game-card-stat game-card-stat-slot-center game-card-stat-color-vesting">
                     Vesting {card.vesting}%
                   </span>
@@ -236,10 +239,18 @@ function Card<T extends GameCard>({
         {card.action === 'reset' && (
           <div className="game-card-reset-badge">Reset Tech Debt & Backlog</div>
         )}
+        {card.action === 'cancel' && (
+          <div className="game-card-cancel-badge">Cancel Manager's Card</div>
+        )}
       </div>
       {stopped && (
         <div className="game-card-stopped-overlay">
           <span className="game-card-stopped-label">STOPPED</span>
+        </div>
+      )}
+      {cancelled && (
+        <div className="game-card-cancelled-overlay">
+          <span className="game-card-cancelled-label">CANCELLED</span>
         </div>
       )}
     </div>

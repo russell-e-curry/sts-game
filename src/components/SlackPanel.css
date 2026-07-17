@@ -1,7 +1,7 @@
-/* Column 3 of .battle-row's grid (see GameBoard.css) — shares the 1fr track with
-   .history-panel, which is what keeps the dropzone column between them exactly
-   centered on screen regardless of window width. */
+/* Fills whatever's left of .battle-row next to .game-column (see GameBoard.css),
+   which is now pinned to the manager's hand-row width instead of sharing space here. */
 .slack-panel {
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;

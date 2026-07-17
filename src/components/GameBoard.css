@@ -50,12 +50,12 @@
   gap: 16px;
 }
 
-/* Grows to take all leftover row width (same as before) but shrinks reluctantly
-   (shrink: 0.4, well below .hud's default 1) and off a non-zero basis, so on a
-   cramped window .hud gives up its width first instead of the manager's cards
-   getting crushed under an aspect-ratio-breaking min-width: 0. */
+/* Sized to fit its own content (the deck plus the 5-card hand) rather than growing
+   into leftover row width — flex: 0 0.4 auto shrinks reluctantly (0.4, well below
+   .hud's default 1) so on a cramped window .hud gives up its width first instead of
+   the manager's cards getting crushed under an aspect-ratio-breaking min-width: 0. */
 .top-bar-manager {
-  flex: 1 0.4 480px;
+  flex: 0 0.4 auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -90,11 +90,13 @@
 }
 
 /* Passthrough wrapper (holds the ref used to place the flight animation) — must carry
-   the row height down to the manager hand so its cards scale like the player's. */
+   the row height down to the manager hand so its cards scale like the player's.
+   flex: 0 0 auto (not 1 1 auto) so it sizes to ManagerHand's natural content width
+   instead of trying to grow into .top-bar-manager, which is now sized the other way
+   around — see GameBoard.css .top-bar-manager and ManagerHand.css .manager-hand. */
 .manager-hand-wrap {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   height: 100%;
-  min-width: 0;
   min-height: 0;
 }
 
@@ -117,10 +119,9 @@
 }
 
 /* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full row
-   height, same as .ad-slot beside it. Never grows past its 420px basis (leftover
-   row width always goes to .top-bar-manager instead, see above) and shrinks freely
-   toward a 200px floor — the meter bars read fine narrower since their type is
-   sized off the panel's height (cqh) rather than its width. */
+   height. Never grows past its 420px basis and shrinks freely toward a 200px floor —
+   the meter bars read fine narrower since their type is sized off the panel's height
+   (cqh) rather than its width. */
 .hud {
   flex: 0 1 420px;
   align-self: stretch;
@@ -149,13 +150,8 @@
   container-type: size;
 }
 
-/* Three columns: history (left) and the Slack panel (right) share the 1fr track, so
-   whatever space each gives up or takes stays mirrored — that's what keeps the
-   dropzone column (auto-width, sized to just fit a card) exactly centered on screen
-   no matter the window width, rather than centered within some sub-box. */
 .battle-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: stretch;
   gap: 20px;
 }

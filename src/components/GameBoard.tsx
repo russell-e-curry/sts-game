@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
 import type { ManagerCard, PlayerCard } from '../types'
 import { sampleHand } from '../data/cards'
 import { sampleManagerCards } from '../data/managerCards'
@@ -6,7 +6,6 @@ import { shuffle } from '../lib/shuffle'
 import Deck from './Deck'
 import ManagerHand from './ManagerHand'
 import Meters from './Meters'
-import AdSlot from './AdSlot'
 import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
@@ -87,14 +86,8 @@ interface RecurringEffect {
 
 function GameBoard() {
   // Shuffled once per mount (game start) so replays don't draw the same cards
-  // in the same order every time — except the fat-slob card, which always opens.
-  const managerDeck = useRef(
-    (() => {
-      const opener = sampleManagerCards.find((c) => c.id === 'mc-coding-fat-slob')
-      const rest = sampleManagerCards.filter((c) => c.id !== 'mc-coding-fat-slob')
-      return opener ? [opener, ...shuffle(rest)] : shuffle(rest)
-    })(),
-  ).current
+  // in the same order every time.
+  const managerDeck = useRef(shuffle(sampleManagerCards)).current
   // The rest of the shuffled deck beyond the starting hand feeds playerDrawPile below,
   // so every card is still reachable — just not all dealt into hand at once.
   const playerCardOrder = useRef(shuffle(sampleHand)).current
@@ -126,6 +119,11 @@ function GameBoard() {
   // Gates the round-start effect below so the manager doesn't play its opening card
   // until the player has dismissed the splash screen.
   const [gameStarted, setGameStarted] = useState(false)
+  // Measured width of the manager's deck + hand (see the ResizeObserver effect below)
+  // — applied to .top-bar-manager directly, since CSS shrink-to-fit doesn't reliably
+  // see through the nested flex layers between .top-bar-manager and the actual hand
+  // cards to compute this on its own.
+  const [managerHandAreaWidth, setManagerHandAreaWidth] = useState<number | null>(null)
 
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
@@ -161,10 +159,6 @@ function GameBoard() {
   // whose deltas keep getting re-applied on every subsequent turn — not just the
   // turn it was played.
   const activeRecurringEffects = useRef<RecurringEffect[]>([])
-  // Total manager cards played so far — only used to detect the very first play (so
-  // the fat-slob opener can jump the queue), since which card plays next is now
-  // chosen from the manager's hand each round rather than by deck position.
-  const managerPlayCount = useRef(0)
   // Cards not currently in hand: drawn from (shuffling the discard back in once
   // exhausted) whenever a played card's slot needs a replacement.
   const playerDrawPile = useRef<PlayerCard[]>(playerCardOrder)
@@ -349,6 +343,25 @@ function GameBoard() {
     }
   }, [])
 
+  // .deck-wrap and .manager-hand-wrap both size themselves to their own content (see
+  // GameBoard.css/ManagerHand.css) regardless of what .top-bar-manager does, so their
+  // combined rendered width is the true "just enough for the deck + hand" measurement
+  // — .top-bar-manager can't compute that itself (see the flex-basis:auto note above).
+  useLayoutEffect(() => {
+    const deckEl = managerDeckRef.current
+    const handEl = managerHandRef.current
+    if (!deckEl || !handEl) return
+    const recompute = () => {
+      // 20px matches .side-row's own gap between the deck and the hand.
+      setManagerHandAreaWidth(deckEl.getBoundingClientRect().width + 20 + handEl.getBoundingClientRect().width)
+    }
+    recompute()
+    const observer = new ResizeObserver(recompute)
+    observer.observe(deckEl)
+    observer.observe(handEl)
+    return () => observer.disconnect()
+  }, [])
+
   const handleDropCard = (cardId: string) => {
     if (!activeManagerCard || activePlayerCard) return
     const slotIndex = hand.findIndex((c) => c?.id === cardId)
@@ -460,18 +473,15 @@ function GameBoard() {
           )
         }
 
-        // The fat-slob opener always leads off the very first round. After that, an
-        // eliminate card with something in hand eligible to eliminate takes priority
-        // over raw damage — shutting down an active player recurring card outweighs a
-        // one-off stat hit — and otherwise the manager plays whatever in hand would
-        // hurt the player most.
-        const opener =
-          managerPlayCount.current === 0 ? handEntries.find((e) => e.card.id === 'mc-coding-fat-slob') : undefined
+        // An eliminate card with something in hand eligible to eliminate takes
+        // priority over raw damage — shutting down an active player recurring card
+        // outweighs a one-off stat hit — and otherwise the manager plays whatever in
+        // hand would hurt the player most.
         const eligibleEliminate = handEntries.filter(
           (e) => e.card.action === 'eliminate' && hasEligiblePlayerRecurringTarget(e.card.type),
         )
         const pool = eligibleEliminate.length > 0 ? eligibleEliminate : handEntries
-        const chosen = opener ?? pool.reduce((best, e) => (damage(e.card) > damage(best.card) ? e : best))
+        const chosen = pool.reduce((best, e) => (damage(e.card) > damage(best.card) ? e : best))
         const { card, id } = chosen
 
         const sourceEl = managerHandRef.current?.querySelector(`[data-card-id="${id}"]`)
@@ -503,7 +513,6 @@ function GameBoard() {
           window.setTimeout(
             () => {
               setActiveManagerCard(card)
-              managerPlayCount.current += 1
               managerDiscard.current.push(card)
               setManagerHand((prev) => prev.map((c, i) => (MANAGER_SLOT_IDS[i] === id ? null : c)))
               setUsedManagerIds((prev) => new Set(prev).add(id))
@@ -545,14 +554,22 @@ function GameBoard() {
       const reversed = activePlayerCard.type === 'reversal'
       const negateClearable = (v: number | '*' | undefined) => (v === undefined || v === '*' ? v : -v)
 
+      // A 'cancel' card neutralizes the manager's card this same round outright — no
+      // deltas, no recurring registration, no eliminate/reset effect — rather than
+      // flipping its sign (that's what 'reversal' does) or stopping a later round
+      // (that's 'eliminate', which targets a recurring effect, not the played card
+      // itself).
+      const cancelled = activePlayerCard.action === 'cancel'
+
       const playerIsRecurring = activePlayerCard.action === 'recurring'
-      const managerIsRecurring = activeManagerCard.action === 'recurring' && !reversed
+      const managerIsRecurring = activeManagerCard.action === 'recurring' && !reversed && !cancelled
 
       // A 'reset' card wipes both backlog and technical debt to 0 outright — reuses
       // the same '*' clearable-delta sentinel applyClearableDelta already honors for
       // per-card wildcard values, so it overrides every other contributing delta that
       // round regardless of side.
-      const isReset = activePlayerCard.action === 'reset' || (activeManagerCard.action === 'reset' && !reversed)
+      const isReset =
+        activePlayerCard.action === 'reset' || (activeManagerCard.action === 'reset' && !reversed && !cancelled)
       const resetSentinel: '*' | undefined = isReset ? '*' : undefined
 
       // An 'eliminate' card stops the most recent still-active OPPOSING-side recurring
@@ -573,10 +590,15 @@ function GameBoard() {
         return null
       }
       const stoppedManagerRoundId = findStoppedRoundId(activePlayerCard, 'manager')
-      const stoppedPlayerRoundId = findStoppedRoundId(activeManagerCard, 'player')
+      // A cancelled manager card had no effect this round, so it can't have eliminated
+      // anything either.
+      const stoppedPlayerRoundId = cancelled ? null : findStoppedRoundId(activeManagerCard, 'player')
 
       setHistory((prev) => {
-        const next = [...prev, { id: roundId, playerCard: activePlayerCard, managerCard: activeManagerCard }]
+        const next = [
+          ...prev,
+          { id: roundId, playerCard: activePlayerCard, managerCard: activeManagerCard, managerCardCancelled: cancelled },
+        ]
         if (!stoppedManagerRoundId && !stoppedPlayerRoundId) return next
         return next.map((r) => {
           if (r.id === stoppedManagerRoundId) return { ...r, managerCardStopped: true }
@@ -615,29 +637,33 @@ function GameBoard() {
       }
 
       const playerBacklog = reversed || playerIsRecurring ? undefined : activePlayerCard.backlog
-      const managerBacklog = managerIsRecurring
-        ? undefined
-        : reversed
-          ? negateClearable(activeManagerCard.backlog)
-          : activeManagerCard.backlog
+      const managerBacklog =
+        managerIsRecurring || cancelled
+          ? undefined
+          : reversed
+            ? negateClearable(activeManagerCard.backlog)
+            : activeManagerCard.backlog
       const playerTechnicalDebt = reversed || playerIsRecurring ? undefined : activePlayerCard.technicalDebt
-      const managerTechnicalDebt = managerIsRecurring
-        ? undefined
-        : reversed
-          ? negateClearable(activeManagerCard.technicalDebt)
-          : activeManagerCard.technicalDebt
+      const managerTechnicalDebt =
+        managerIsRecurring || cancelled
+          ? undefined
+          : reversed
+            ? negateClearable(activeManagerCard.technicalDebt)
+            : activeManagerCard.technicalDebt
       const playerBurnout = reversed || playerIsRecurring ? 0 : activePlayerCard.burnout ?? 0
-      const managerBurnout = managerIsRecurring
-        ? 0
-        : reversed
-          ? -(activeManagerCard.burnout ?? 0)
-          : activeManagerCard.burnout ?? 0
+      const managerBurnout =
+        managerIsRecurring || cancelled
+          ? 0
+          : reversed
+            ? -(activeManagerCard.burnout ?? 0)
+            : activeManagerCard.burnout ?? 0
       const playerVesting = reversed || playerIsRecurring ? 0 : activePlayerCard.vesting ?? 0
-      const managerVesting = managerIsRecurring
-        ? 0
-        : reversed
-          ? -(activeManagerCard.vesting ?? 0)
-          : activeManagerCard.vesting ?? 0
+      const managerVesting =
+        managerIsRecurring || cancelled
+          ? 0
+          : reversed
+            ? -(activeManagerCard.vesting ?? 0)
+            : activeManagerCard.vesting ?? 0
 
       const liveRecurringEffects = activeRecurringEffects.current.filter((e) => !e.stopped)
       const recurringBacklog = liveRecurringEffects.map((e) => e.backlog)
@@ -726,7 +752,10 @@ function GameBoard() {
       {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
 
       <div className="top-bar">
-        <div className="top-bar-manager">
+        <div
+          className="top-bar-manager"
+          style={managerHandAreaWidth != null ? { width: managerHandAreaWidth } : undefined}
+        >
           <p className="side-label">Your manager</p>
           <div className="side-row">
             <div className="deck-wrap" ref={managerDeckRef}>
@@ -743,8 +772,6 @@ function GameBoard() {
             <Meters backlog={backlog} technicalDebt={technicalDebt} burnout={burnout} vesting={vesting} />
           </div>
         </div>
-
-        <AdSlot />
       </div>
 
       <div className="battle-row">
@@ -753,6 +780,7 @@ function GameBoard() {
           history={history}
           activePlayerCard={activePlayerCard}
           activeManagerCard={activeManagerCard}
+          historyWidth={managerHandAreaWidth}
         />
         <SlackPanel
           channels={CHANNEL_ORDER}

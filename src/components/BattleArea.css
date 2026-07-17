@@ -1,10 +1,13 @@
-/* Column 1 of .battle-row's grid (see GameBoard.css) — the scrolling list of
-   already-played rounds. Carries the "battle arena" look (dashed border, purple glow)
-   that used to wrap this and the active column together; the dropzone slots read as
-   drop targets on their own via .battle-slot-placeholder's dashed border, so they
-   don't need a shared outer box anymore. */
+/* First column of .battle-row (see GameBoard.css) — the scrolling list of
+   already-played rounds, i.e. the "battle area" itself. Carries the "battle arena"
+   look (dashed border, purple glow) that used to wrap this and the active column
+   together; the dropzone slots read as drop targets on their own via
+   .battle-slot-placeholder's dashed border, so they don't need a shared outer box
+   anymore. flex-shrink: 0 so it holds its pinned width (see BattleArea.tsx) exactly
+   rather than getting squeezed by its .battle-row siblings. */
 .history-panel {
   position: relative;
+  flex-shrink: 0;
   min-width: 0;
   min-height: 0;
   border: 2px dashed rgba(170, 59, 255, 0.4);
@@ -98,11 +101,14 @@
   }
 }
 
-/* Column 2 of .battle-row's grid — auto-width (just wide enough for a card plus some
-   breathing room for its own dashed border), and exactly centered on screen because
-   columns 1 and 3 share the same 1fr track. */
+/* Second column of .battle-row — its own column, separate from .history-panel: this
+   is where a card sits while it's actually being played, not part of the "battle
+   area" of already-played history. Auto-width (just wide enough for a card plus some
+   breathing room for its own dashed border); flex-shrink: 0 so it never gets squeezed
+   by its siblings. */
 .active-column {
   position: relative;
+  flex-shrink: 0;
   min-height: 0;
   height: 100%;
   display: flex;

@@ -14,18 +14,25 @@ export interface ResolvedRound {
   /** Set once a manager 'eliminate' card of the same type stops this round's player
    * recurring effect — renders the STOPPED overlay on the player's card. */
   playerCardStopped?: boolean
+  /** Set when this round's player card has action 'cancel' — neutralizes the
+   * manager's card this same round and renders the CANCELLED overlay on it. */
+  managerCardCancelled?: boolean
 }
 
 interface BattleAreaProps {
   history: ResolvedRound[]
   activePlayerCard: PlayerCard | null
   activeManagerCard: ManagerCard | null
+  /** Pinned to the same measured width as .top-bar-manager (see GameBoard.tsx) so the
+   * played-card history lines up with the manager's hand row above it. The active
+   * dropzone is a separate column and isn't sized off this. */
+  historyWidth?: number | null
 }
 
 const MIN_THUMB_WIDTH = 40
 
 const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleArea(
-  { history, activePlayerCard, activeManagerCard },
+  { history, activePlayerCard, activeManagerCard, historyWidth },
   activeSlotRef,
 ) {
   const historyRowRef = useRef<HTMLDivElement>(null)
@@ -144,9 +151,14 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
 
   return (
     <>
-      {/* Grid column 1 of .battle-row (see GameBoard.css) — the scrolling list of
-          already-played rounds. */}
-      <div className="history-panel" ref={historyRowRef}>
+      {/* The "battle area" — where played cards end up, as opposed to .active-column
+          below, which is where a card sits while it's actually being played. Pinned
+          to historyWidth so it lines up with the manager's hand row. */}
+      <div
+        className="history-panel"
+        ref={historyRowRef}
+        style={historyWidth != null ? { width: historyWidth } : undefined}
+      >
         <div
           className="history-track"
           ref={historyTrackRef}
@@ -163,7 +175,12 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
           {history.map((round) => (
             <div key={round.id} data-round-id={round.id} className="battle-column-history">
               <div className="battle-slot">
-                <Card card={round.managerCard} played stopped={round.managerCardStopped} />
+                <Card
+                  card={round.managerCard}
+                  played
+                  stopped={round.managerCardStopped}
+                  cancelled={round.managerCardCancelled}
+                />
               </div>
               <div className="battle-slot">
                 <Card card={round.playerCard} played stopped={round.playerCardStopped} />
@@ -188,8 +205,9 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
         </div>
       </div>
 
-      {/* Grid column 2 (auto-width, sized to just fit a card) — sits exactly centered
-          on screen because columns 1 and 3 share the same 1fr track. */}
+      {/* Its own column in .battle-row (see GameBoard.css), separate from
+          .history-panel — sized to just fit a card, not pinned to any measured
+          width. */}
       <div className="active-column">
         <div className="battle-slot" ref={activeSlotRef}>
           {activeManagerCard ? (

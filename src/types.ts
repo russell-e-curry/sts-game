@@ -4,7 +4,7 @@ interface CardBase {
   /** Thematic category, e.g. "meeting", "coding", "management", "hiring". Displayed on the card face. */
   type: string
   /** What kind of effect this card has. Displayed on the card face, next to the type. */
-  action: 'one time' | 'recurring' | 'reversal' | 'eliminate' | 'reset'
+  action: 'one time' | 'recurring' | 'reversal' | 'eliminate' | 'reset' | 'cancel'
   description: string
   /** Derived from the card's filename; the file may not exist yet if no art has been made. */
   image: string

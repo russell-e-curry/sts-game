@@ -47,12 +47,14 @@
 }
 
 /* Most source art is ~4:3 landscape, not square — a square frame made object-fit:
-   cover crop off a big chunk of the image's left/right edges. A 4:3 frame matches the
-   source aspect so cover shows the image's full horizontal extent (square art just
-   gets cropped top/bottom instead, which loses far less of the artwork). */
+   cover crop off a big chunk of the image's left/right edges. Slightly taller than
+   the source's true 4:3 so the art claims more of the card's height (and the
+   description body correspondingly less, via its own flex: 1 1 0 — see
+   .game-card-overlay .game-card-body) — cover still shows the image's full
+   horizontal extent, just crops a bit more off the top/bottom than a true 4:3 would. */
 .game-card-overlay .game-card-art-frame {
   height: auto;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 5 / 4;
 }
 
 .game-card-dimmed {
@@ -102,6 +104,34 @@
 }
 
 .game-card-stopped-label {
+  font-size: 14cqw;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.9);
+  transform: rotate(-8deg);
+}
+
+/* Same idea as .game-card-stopped-overlay, but for a card neutralized the same round
+   by a player's 'cancel' card rather than a later-round eliminate — see GameBoard.tsx. */
+.game-card-cancelled-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.3),
+    rgba(0, 0, 0, 0.3) 10px,
+    rgba(255, 255, 255, 0.3) 10px,
+    rgba(255, 255, 255, 0.3) 20px
+  );
+}
+
+.game-card-cancelled-label {
   font-size: 14cqw;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -179,6 +209,22 @@
   text-align: center;
   letter-spacing: 0.27cqw;
   box-shadow: 0 0 10px rgba(212, 160, 23, 0.6);
+}
+
+/* Same silver used for the recurring card face, so "cancel" reads as a neutral,
+   metallic counter rather than the eliminate badge's red warning. Dark text (rather
+   than white) for contrast against the light gradient. */
+.game-card-cancel-badge {
+  flex-shrink: 0;
+  padding: 2.67cqw 4cqw;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2f3f5, #b7bcc4);
+  color: #23242c;
+  font-size: 5.33cqw;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.27cqw;
+  box-shadow: 0 0 10px rgba(183, 188, 196, 0.6);
 }
 
 .game-card-template-recurring .game-card-rules {
@@ -287,7 +333,7 @@
   font-weight: 700;
   text-align: center;
   color: #fff;
-  border-radius: 999px;
+  border-radius: 4cqw;
   padding: 2cqw 4cqw;
   white-space: nowrap;
   overflow: hidden;
@@ -312,13 +358,18 @@
   justify-self: end;
 }
 
+/* Flat fills, not gradients: a gradient forces one text color to sit against two
+   different background luminances, and the lighter end of each of these previously
+   fell below WCAG AA contrast (as low as ~2.8:1) against the white badge text at this
+   font size. Each flat color below is the gradient's darker stop, which already
+   cleared 4.5:1+ on its own. */
 .game-card-stat-color-backlog {
-  background: linear-gradient(90deg, #2f8fff, #1a5fd6);
+  background: #1a5fd6;
   box-shadow: 0 0 10px rgba(47, 143, 255, 0.6);
 }
 
 .game-card-stat-color-techdebt {
-  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+  background: #7a1fd6;
   box-shadow: 0 0 10px rgba(170, 59, 255, 0.6);
 }
 
@@ -332,6 +383,6 @@
   /* Reserves room for a sign plus 3 digits (e.g. "+100"/"-100") so the badge doesn't
      resize as its value changes. */
   min-width: 4ch;
-  background: linear-gradient(90deg, #ff6b5b, #c81e1e);
+  background: #c81e1e;
   box-shadow: 0 0 10px rgba(200, 30, 30, 0.6);
 }
