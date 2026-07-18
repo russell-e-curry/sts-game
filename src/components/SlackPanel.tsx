@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { forwardRef, useState } from 'react'
 import { slackPfp } from '../data/slackChannels'
 import './SlackPanel.css'
 
@@ -67,14 +67,19 @@ function SlackAvatar({ character }: { character: string }) {
   )
 }
 
-function SlackPanel({ channels, activeChannel, onSelectChannel, messages }: SlackPanelProps) {
+// The forwarded ref lets GameBoard measure the rendered panel width and match the
+// meters panel to it (see the ResizeObserver effect in GameBoard).
+const SlackPanel = forwardRef<HTMLDivElement, SlackPanelProps>(function SlackPanel(
+  { channels, activeChannel, onSelectChannel, messages },
+  panelRef,
+) {
   // Newest last (chronological) in the array, but rendered oldest-last so the
   // column-reverse flex flow (see SlackPanel.css) keeps the view pinned to the
   // newest message without any manual scroll-to-bottom logic.
   const channelMessages = messages.filter((m) => m.channel === activeChannel).reverse()
 
   return (
-    <div className="slack-panel">
+    <div className="slack-panel" ref={panelRef}>
       <div className="slack-sidebar">
         <div className="slack-workspace-name">Widget Corp</div>
         <div className="slack-channel-list">
@@ -143,6 +148,6 @@ function SlackPanel({ channels, activeChannel, onSelectChannel, messages }: Slac
       </div>
     </div>
   )
-}
+})
 
 export default SlackPanel

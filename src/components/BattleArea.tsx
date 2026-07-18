@@ -27,12 +27,15 @@ interface BattleAreaProps {
    * played-card history lines up with the manager's hand row above it. The active
    * dropzone is a separate column and isn't sized off this. */
   historyWidth?: number | null
+  /** Briefly shown in the player's active-column slot when a locked card is dropped
+   * there instead of played (see GameBoard's showLockMessage). */
+  lockMessage?: string | null
 }
 
 const MIN_THUMB_WIDTH = 40
 
 const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleArea(
-  { history, activePlayerCard, activeManagerCard, historyWidth },
+  { history, activePlayerCard, activeManagerCard, historyWidth, lockMessage },
   activeSlotRef,
 ) {
   const historyRowRef = useRef<HTMLDivElement>(null)
@@ -222,6 +225,10 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
               <Card card={activePlayerCard} />
               <SparkleBurst />
             </>
+          ) : lockMessage ? (
+            <div className="battle-slot-placeholder battle-slot-placeholder-player battle-slot-placeholder-locked">
+              <p className="battle-slot-placeholder-label battle-slot-placeholder-label-locked">{lockMessage}</p>
+            </div>
           ) : (
             <div className="battle-slot-placeholder battle-slot-placeholder-player">
               <p className="battle-slot-placeholder-label">Play a Card</p>

@@ -62,6 +62,19 @@
   pointer-events: none;
 }
 
+/* A locked card (its character hasn't been introduced on this side yet) stays fully
+   interactive — dragging it to the drop zone is how the player finds out why — so it
+   only dims, unlike .game-card-dimmed which also kills pointer-events. */
+.game-card-locked {
+  opacity: 0.5;
+}
+
+/* While a locked card is actually being dragged, the resting slot goes back to the
+   normal drag-dimmed look rather than compounding both opacities. */
+.game-card-dimmed.game-card-locked {
+  opacity: 0.25;
+}
+
 .game-card:active {
   cursor: grabbing;
 }

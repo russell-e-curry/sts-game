@@ -2,6 +2,7 @@
   "title": "Nepotism",
   "type": "coding",
   "action": "one time",
+  "character": "boss' nephew",
   "description": "Your boss' slob nephew invents his own CI/CD platform, the boss wants it implemented asap.",
   "backlog": 50,
   "burnout": 25

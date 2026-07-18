@@ -10,7 +10,7 @@ export type SoundName =
   | 'pc-action-draw-card'
   | 'mc-action-flip-card'
   | 'pc-action-flip-card'
-  | 'pc-action-discard-card'
+  | 'gm-action-player-discard'
   | 'gm-action-slack-message'
 
 // A fresh Audio() per call (rather than one reused instance) so the same sound can

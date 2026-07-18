@@ -119,9 +119,11 @@
 }
 
 /* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full row
-   height. Never grows past its 420px basis and shrinks freely toward a 200px floor —
-   the meter bars read fine narrower since their type is sized off the panel's height
-   (cqh) rather than its width. */
+   height. The 420px/200px basis below is only a fallback for before GameBoard's
+   ResizeObserver has measured the Slack panel (see slackPanelWidth) — once measured,
+   an inline flex-basis pins .hud to that same width so the meters panel matches the
+   Slack panel's width. The meter bars read fine narrower since their type is sized off
+   the panel's height (cqh) rather than its width. */
 .hud {
   flex: 0 1 420px;
   align-self: stretch;

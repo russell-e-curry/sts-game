@@ -137,6 +137,9 @@ function GameBoard() {
   const [playerFlight, setPlayerFlight] = useState<PlayerFlight | null>(null)
   const [managerDrawFlight, setManagerDrawFlight] = useState<ManagerDrawFlight | null>(null)
   const [discardEffect, setDiscardEffect] = useState<DiscardEffect | null>(null)
+  // Briefly shown in the active column's player slot when a locked card is dropped
+  // there — cleared by lockMessageTimer below after a few seconds.
+  const [lockMessage, setLockMessage] = useState<string | null>(null)
   const [backlog, setBacklog] = useState(0)
   const [technicalDebt, setTechnicalDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
@@ -163,6 +166,11 @@ function GameBoard() {
   // see through the nested flex layers between .top-bar-manager and the actual hand
   // cards to compute this on its own.
   const [managerHandAreaWidth, setManagerHandAreaWidth] = useState<number | null>(null)
+  // Measured width of the Slack panel (see the ResizeObserver effect below) — applied
+  // to .hud so the meters panel matches its width instead of sizing off its own
+  // unrelated 420px flex-basis.
+  const [slackPanelWidth, setSlackPanelWidth] = useState<number | null>(null)
+  const slackPanelRef = useRef<HTMLDivElement>(null)
 
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
@@ -196,6 +204,7 @@ function GameBoard() {
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
   const discardTimers = useRef<number[]>([])
+  const lockMessageTimer = useRef<number | null>(null)
   const roundCounter = useRef(0)
   // Gives every flight (manager play, player draw, manager draw) a unique React key
   // so back-to-back flights — as when the opening deal chains six draws in a row —
@@ -206,6 +215,14 @@ function GameBoard() {
   // whose deltas keep getting re-applied on every subsequent turn — not just the
   // turn it was played.
   const activeRecurringEffects = useRef<RecurringEffect[]>([])
+  // Names of characters whose 'character'-action card has resolved on their side —
+  // once added, stays forever (nothing currently un-introduces a character). Gates
+  // isCardLocked below: a 'coding' card naming a character can't be played on that
+  // side until that character's own introduction card has landed.
+  const revealedCharacters = useRef<{ player: Set<string>; manager: Set<string> }>({
+    player: new Set(),
+    manager: new Set(),
+  })
   // Cards not currently in hand: drawn from (shuffling the discard back in once
   // exhausted) whenever a played card's slot needs a replacement.
   const playerDrawPile = useRef<PlayerCard[]>(playerCardOrder)
@@ -409,6 +426,7 @@ function GameBoard() {
       discardTimers.current = []
       conversationTimers.current.forEach((t) => clearTimeout(t))
       conversationTimers.current = []
+      if (lockMessageTimer.current != null) clearTimeout(lockMessageTimer.current)
     }
   }, [])
 
@@ -458,11 +476,48 @@ function GameBoard() {
     return () => observer.disconnect()
   }, [])
 
+  // Keeps .hud's width matched to the Slack panel's rendered width (see SlackPanel's
+  // forwarded ref) — the two live in separate flex contexts (.top-bar vs .battle-row),
+  // so there's no CSS-only way to size one off the other.
+  useLayoutEffect(() => {
+    const panelEl = slackPanelRef.current
+    if (!panelEl) return
+    const recompute = () => setSlackPanelWidth(panelEl.getBoundingClientRect().width)
+    recompute()
+    const observer = new ResizeObserver(recompute)
+    observer.observe(panelEl)
+    return () => observer.disconnect()
+  }, [])
+
+  // A 'coding' card naming a character is a follow-up to that character's own
+  // 'character'-action introduction card, and can't be played on this side until
+  // that introduction has resolved (see revealedCharacters above).
+  const isCardLocked = (card: PlayerCard | ManagerCard, side: 'player' | 'manager') =>
+    card.type === 'coding' &&
+    card.action !== 'character' &&
+    !!card.character &&
+    !revealedCharacters.current[side].has(card.character)
+
+  // Shown in the active column's player slot for a few seconds, then cleared —
+  // called instead of actually playing a card whose character hasn't been
+  // introduced yet (see isCardLocked/handleDropCard).
+  const showLockMessage = (character: string) => {
+    if (lockMessageTimer.current != null) window.clearTimeout(lockMessageTimer.current)
+    setLockMessage(`You need to play the "${character}" character card first`)
+    lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
+  }
+
   const handleDropCard = (cardId: string) => {
     if (!activeManagerCard || activePlayerCard) return
     const slotIndex = hand.findIndex((c) => c?.id === cardId)
     if (slotIndex === -1) return
     const card = hand[slotIndex]!
+    // Locked cards never leave the hand — dropping one just shows why, leaving the
+    // card to snap back to its resting slot once the drag ends.
+    if (isCardLocked(card, 'player')) {
+      showLockMessage(card.character!)
+      return
+    }
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
     setActivePlayerCard(card)
     playerDiscard.current.push(card)
@@ -483,7 +538,7 @@ function GameBoard() {
 
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
     playerDiscard.current.push(card)
-    playSound('pc-action-discard-card')
+    playSound('gm-action-player-discard')
 
     if (!rect) {
       startPlayerDraw(slotIndex)
@@ -521,12 +576,15 @@ function GameBoard() {
     discardTimers.current = []
     conversationTimers.current.forEach((t) => clearTimeout(t))
     conversationTimers.current = []
+    if (lockMessageTimer.current != null) clearTimeout(lockMessageTimer.current)
+    lockMessageTimer.current = null
 
     managerDrawPile.current = shuffle(sampleManagerCards)
     managerDiscard.current = []
     playerDrawPile.current = shuffle(sampleHand)
     playerDiscard.current = []
     activeRecurringEffects.current = []
+    revealedCharacters.current = { player: new Set(), manager: new Set() }
     usedSlackItems.current = new Set()
     conversationInProgress.current = false
     roundCounter.current = 0
@@ -544,6 +602,7 @@ function GameBoard() {
     setPlayerFlight(null)
     setManagerDrawFlight(null)
     setDiscardEffect(null)
+    setLockMessage(null)
     setBacklog(0)
     setTechnicalDebt(0)
     setBurnout(STARTING_BURNOUT)
@@ -655,6 +714,7 @@ function GameBoard() {
         const handEntries = managerHand
           .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
           .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
+          .filter((entry) => !isCardLocked(entry.card, 'manager'))
         if (handEntries.length === 0) return
 
         // Normalized (percent-of-max) estimate of how much playing this card would
@@ -839,6 +899,16 @@ function GameBoard() {
         })
       }
 
+      // A 'character'-action card introduces its character to that side's story —
+      // unlocking any 'coding' card naming the same character (see isCardLocked). A
+      // cancelled manager card never took effect, so it doesn't introduce anyone.
+      if (activePlayerCard.action === 'character' && activePlayerCard.character) {
+        revealedCharacters.current.player.add(activePlayerCard.character)
+      }
+      if (activeManagerCard.action === 'character' && !cancelled && activeManagerCard.character) {
+        revealedCharacters.current.manager.add(activeManagerCard.character)
+      }
+
       const playerBacklog = reversed || playerIsRecurring ? undefined : activePlayerCard.backlog
       const managerBacklog =
         managerIsRecurring || cancelled
@@ -950,6 +1020,10 @@ function GameBoard() {
     return () => clearTimeout(resolveTimer)
   }, [activePlayerCard, activeManagerCard])
 
+  const lockedCardIds = new Set(
+    hand.filter((c): c is PlayerCard => c !== null && isCardLocked(c, 'player')).map((c) => c.id),
+  )
+
   return (
     <div className={`game-board${draggingCard ? ' game-board-dragging' : ''}`}>
       {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
@@ -971,7 +1045,10 @@ function GameBoard() {
           </div>
         </div>
 
-        <div className="hud">
+        <div
+          className="hud"
+          style={slackPanelWidth != null ? { flex: `0 0 ${slackPanelWidth}px`, minWidth: 0 } : undefined}
+        >
           <div className="hud-panel">
             <Meters backlog={backlog} technicalDebt={technicalDebt} burnout={burnout} vesting={vesting} />
           </div>
@@ -985,8 +1062,10 @@ function GameBoard() {
           activePlayerCard={activePlayerCard}
           activeManagerCard={activeManagerCard}
           historyWidth={managerHandAreaWidth}
+          lockMessage={lockMessage}
         />
         <SlackPanel
+          ref={slackPanelRef}
           channels={CHANNEL_ORDER}
           activeChannel={activeSlackChannel}
           onSelectChannel={setActiveSlackChannel}
@@ -1001,7 +1080,12 @@ function GameBoard() {
             <Deck image="/cards/pc-player-back-image.webp" count={34} />
           </div>
           <div className="hand-wrap" ref={handRef}>
-            <Hand cards={hand} draggingCardId={draggingCard?.id ?? null} onCardPointerDown={handleCardPointerDown} />
+            <Hand
+              cards={hand}
+              draggingCardId={draggingCard?.id ?? null}
+              lockedCardIds={lockedCardIds}
+              onCardPointerDown={handleCardPointerDown}
+            />
           </div>
         </div>
       </div>

@@ -7,10 +7,14 @@ import './Hand.css'
 interface HandProps {
   cards: (PlayerCard | null)[]
   draggingCardId?: string | null
+  /** Ids of cards that can't be played yet — their character's own 'character'-action
+   * card hasn't landed on the player's side (see GameBoard's isCardLocked). Rendered
+   * dimmer than a normal card so the player can see why before even trying to play it. */
+  lockedCardIds?: Set<string>
   onCardPointerDown?: (e: PointerEvent, card: PlayerCard) => void
 }
 
-function Hand({ cards, draggingCardId, onCardPointerDown }: HandProps) {
+function Hand({ cards, draggingCardId, lockedCardIds, onCardPointerDown }: HandProps) {
   return (
     <div className="hand">
       {cards.map((card, i) => (
@@ -19,6 +23,7 @@ function Hand({ cards, draggingCardId, onCardPointerDown }: HandProps) {
             <Card
               card={card}
               dimmed={card.id === draggingCardId}
+              locked={lockedCardIds?.has(card.id)}
               onPointerDown={onCardPointerDown}
               expandOnClick
             />

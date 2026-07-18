@@ -181,6 +181,30 @@
   }
 }
 
+/* Same idea as .battle-slot-placeholder-player's glow, but red — flags a rejected
+   drop (a locked card) rather than the normal purple "waiting for a play" pulse. Wins
+   over the purple animation via source order (both classes sit on the same element). */
+.battle-slot-placeholder-locked {
+  animation: battle-slot-locked-glow 1s ease-in-out infinite;
+}
+
+@keyframes battle-slot-locked-glow {
+  0%,
+  100% {
+    border-color: rgba(200, 30, 30, 0.45);
+    box-shadow: 0 0 6px 1px rgba(200, 30, 30, 0.25);
+  }
+  50% {
+    border-color: rgba(200, 30, 30, 0.95);
+    box-shadow: 0 0 20px 5px rgba(200, 30, 30, 0.65);
+  }
+}
+
+.battle-slot-placeholder-label-locked {
+  color: #ff9d9d;
+  text-shadow: 0 0 8px rgba(255, 60, 60, 0.8);
+}
+
 .flip-card {
   width: 100%;
   height: 100%;

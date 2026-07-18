@@ -6,6 +6,8 @@ import './Card.css'
 interface CardProps<T extends GameCard> {
   card: T
   dimmed?: boolean
+  /** Renders dimmer than a normal card — its character hasn't been introduced on this side yet, so it can't be played (see GameBoard's isCardLocked). Unlike `dimmed`, still draggable/discardable. */
+  locked?: boolean
   /** Lets a click toggle the same enlarge treatment hover gives cards elsewhere (e.g. the hand). */
   expandOnClick?: boolean
   /** Applies the hover-expanded look without needing a real hover/click (e.g. the drag ghost, which is pointer-events: none so it never receives those events itself). */
@@ -39,6 +41,7 @@ interface OverlayGeom {
 function Card<T extends GameCard>({
   card,
   dimmed,
+  locked,
   expandOnClick,
   forceExpanded,
   played,
@@ -165,7 +168,7 @@ function Card<T extends GameCard>({
   return (
     <div
       ref={rootRef}
-      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !cancelled ? ' game-card-recurring' : ''}`}
+      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !cancelled ? ' game-card-recurring' : ''}`}
       style={style}
       onPointerDown={onPointerDown ? (e) => onPointerDown(e, card) : undefined}
       onMouseEnter={handleMouseEnter}
