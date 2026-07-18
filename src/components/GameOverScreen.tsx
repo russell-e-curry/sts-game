@@ -14,12 +14,13 @@ const COPY = {
   lose: {
     title: 'Game Over',
     subtitle: 'The sprint buried you before your equity vested.',
-    image: '/splash/lose/gm-splash-you-lose.webp',
+    video: '/splash/lose/gm-splash-vid-you-lose.mp4',
   },
 } as const
 
 function GameOverScreen({ result, onRestart }: GameOverScreenProps) {
-  const { title, subtitle, image } = COPY[result]
+  const copy = COPY[result]
+  const { title, subtitle } = copy
 
   return (
     <div className={`game-over-screen game-over-screen-${result}`}>
@@ -27,14 +28,26 @@ function GameOverScreen({ result, onRestart }: GameOverScreenProps) {
         <h1 className="game-over-title">{title}</h1>
         <p className="game-over-subtitle">{subtitle}</p>
 
-        <img
-          className="game-over-image"
-          src={image}
-          alt=""
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
+        {'video' in copy ? (
+          <video
+            className="game-over-image"
+            src={copy.video}
+            autoPlay
+            playsInline
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : (
+          <img
+            className="game-over-image"
+            src={copy.image}
+            alt=""
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        )}
 
         <button className="game-over-restart" onClick={onRestart}>
           PLAY AGAIN
