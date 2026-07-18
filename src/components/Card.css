@@ -241,6 +241,28 @@
   color: #1a1b20;
 }
 
+/* Character-attribution cards get a bright gold face — the same gold used for the
+   reset badge and vesting stat pills — so a card centered on a specific person
+   stands out rather than blending into the default charcoal face. Text flips dark,
+   same approach as the recurring card's light silver face above. */
+.game-card-template-character {
+  background: linear-gradient(160deg, #ffd76a, #d4a017);
+}
+
+.game-card-template-character .game-card-type,
+.game-card-template-character .game-card-action,
+.game-card-template-character .game-card-name {
+  color: #23242c;
+}
+
+.game-card-template-character .game-card-body {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.game-card-template-character .game-card-rules {
+  color: #23242c;
+}
+
 .game-card-header {
   display: flex;
   align-items: center;

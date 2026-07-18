@@ -158,7 +158,9 @@ function Card<T extends GameCard>({
       ? ' game-card-template-recurring'
       : card.action === 'eliminate'
         ? ' game-card-template-eliminate'
-        : ''
+        : card.action === 'character' && card.character
+          ? ' game-card-template-character'
+          : ''
 
   return (
     <div
@@ -234,7 +236,9 @@ function Card<T extends GameCard>({
           </div>
         )}
         {card.action === 'eliminate' && (
-          <div className="game-card-eliminate-badge">Stop a Recurring Card</div>
+          <div className="game-card-eliminate-badge">
+            {card.character ? `Eliminate the ${card.character}` : 'Stop a Recurring Card'}
+          </div>
         )}
         {card.action === 'reset' && (
           <div className="game-card-reset-badge">Reset Tech Debt & Backlog</div>

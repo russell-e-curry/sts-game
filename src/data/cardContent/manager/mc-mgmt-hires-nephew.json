@@ -1,7 +1,9 @@
 {
-  "title": "Nepotism",
-  "type": "coding",
-  "action": "recurring",
+  "title": "The Boss's Nephew",
+  "type": "management",
+  "action": "character",
+  "character" : "boss' nephew",
   "description": "Your boss hires his slob nephew, who has no skills apart from spilling food on his shirt.",
-  "backlog": 25
+  "backlog": 10,
+  "burnout": 5
 }

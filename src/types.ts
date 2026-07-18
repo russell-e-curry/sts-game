@@ -4,8 +4,10 @@ interface CardBase {
   /** Thematic category, e.g. "meeting", "coding", "management", "hiring". Displayed on the card face. */
   type: string
   /** What kind of effect this card has. Displayed on the card face, next to the type. */
-  action: 'one time' | 'recurring' | 'reversal' | 'eliminate' | 'reset' | 'cancel'
+  action: 'one time' | 'recurring' | 'reversal' | 'eliminate' | 'reset' | 'cancel' | 'character'
   description: string
+  /** Who this card is attributed to, e.g. "CMO". Omitted if the card has no specific character tied to it. */
+  character?: string
   /** Derived from the card's filename; the file may not exist yet if no art has been made. */
   image: string
   /** Signed delta applied to the player's backlog, or '*' to clear it to 0. Omitted if this card doesn't touch it. */
