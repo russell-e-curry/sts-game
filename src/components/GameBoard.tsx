@@ -144,6 +144,11 @@ function GameBoard() {
   const [technicalDebt, setTechnicalDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
   const [vesting, setVesting] = useState(0)
+  // Bumped once per resolved round, right as the meters get their new values — passed
+  // to Meters as a remount key for its flash overlay (see meter-bar-flash in
+  // Meters.css) so the flash restarts every round even though the meters themselves
+  // stay mounted the whole game.
+  const [meterFlashKey, setMeterFlashKey] = useState(0)
   const [roundKey, setRoundKey] = useState(0)
   // Set once backlog/technical debt/burnout hits its cap (lose) or vesting hits 100%
   // (win) — see the effect below. Also gates the round-start effect so the manager
@@ -204,6 +209,11 @@ function GameBoard() {
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
   const discardTimers = useRef<number[]>([])
+  // Holds the one-per-round timer that delays picking/posting the round's Slack
+  // message until a beat after the meter flash + gm-action-meter-up sound land (see
+  // the round-resolve effect below), so cleared on unmount/replay same as every
+  // other timer bucket.
+  const slackDelayTimers = useRef<number[]>([])
   const lockMessageTimer = useRef<number | null>(null)
   const roundCounter = useRef(0)
   // Gives every flight (manager play, player draw, manager draw) a unique React key
@@ -424,6 +434,8 @@ function GameBoard() {
       managerDrawTimers.current = []
       discardTimers.current.forEach((t) => clearTimeout(t))
       discardTimers.current = []
+      slackDelayTimers.current.forEach((t) => clearTimeout(t))
+      slackDelayTimers.current = []
       conversationTimers.current.forEach((t) => clearTimeout(t))
       conversationTimers.current = []
       if (lockMessageTimer.current != null) clearTimeout(lockMessageTimer.current)
@@ -574,6 +586,8 @@ function GameBoard() {
     managerDrawTimers.current = []
     discardTimers.current.forEach((t) => clearTimeout(t))
     discardTimers.current = []
+    slackDelayTimers.current.forEach((t) => clearTimeout(t))
+    slackDelayTimers.current = []
     conversationTimers.current.forEach((t) => clearTimeout(t))
     conversationTimers.current = []
     if (lockMessageTimer.current != null) clearTimeout(lockMessageTimer.current)
@@ -607,6 +621,7 @@ function GameBoard() {
     setTechnicalDebt(0)
     setBurnout(STARTING_BURNOUT)
     setVesting(0)
+    setMeterFlashKey(0)
     setRoundKey(0)
     setGameOver(null)
     setSlackMessages([])
@@ -944,77 +959,60 @@ function GameBoard() {
       const recurringBurnout = liveRecurringEffects.map((e) => e.burnout)
       const recurringVesting = liveRecurringEffects.map((e) => e.vesting)
 
-      // Once per round, a random still-unused flavor message (or whole conversation)
-      // posts to its channel and nudges the meters same as a played card would. A
-      // conversation's deltas are applied message-by-message as it plays out instead
-      // of all at once here (see runConversation), so it's excluded below when picked.
-      // While a previously picked conversation is still posting, skip picking anything
-      // new this round — it resumes picking once that conversation finishes.
-      let immediateMessage: SlackMessageJson | null = null
-      let startedConversation: { channel: string; messages: SlackMessageJson[] } | null = null
-
-      const picked = conversationInProgress.current ? null : pickSlackItem()
-      if (picked) {
-        usedSlackItems.current.add(picked.key)
-        if (isSlackConversation(picked.item)) {
-          startedConversation = { channel: picked.channel, messages: picked.item.messages }
-          conversationInProgress.current = true
-          setActiveSlackChannel(picked.channel)
-        } else {
-          immediateMessage = picked.item
-          postSlackMessage(picked.channel, picked.item)
-        }
-      }
-
-      setBacklog((prev) =>
-        applyClearableDelta(prev, [
-          playerBacklog,
-          managerBacklog,
-          resetSentinel,
-          immediateMessage?.backlog,
-          ...recurringBacklog,
-        ]),
-      )
+      setBacklog((prev) => applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]))
       setTechnicalDebt((prev) =>
-        applyClearableDelta(prev, [
-          playerTechnicalDebt,
-          managerTechnicalDebt,
-          resetSentinel,
-          immediateMessage?.techDebt,
-          ...recurringTechnicalDebt,
-        ]),
+        applyClearableDelta(prev, [playerTechnicalDebt, managerTechnicalDebt, resetSentinel, ...recurringTechnicalDebt]),
       )
       setBurnout((prev) =>
-        Math.min(
-          BURNOUT_MAX,
-          Math.max(
-            0,
-            prev + sumDeltas([playerBurnout, managerBurnout, immediateMessage?.burnout, ...recurringBurnout]),
-          ),
-        ),
+        Math.min(BURNOUT_MAX, Math.max(0, prev + sumDeltas([playerBurnout, managerBurnout, ...recurringBurnout]))),
       )
       // Vesting ticks up 1% every turn regardless of which cards were played, on top
       // of whatever the cards themselves add or subtract.
       setVesting((prev) =>
         Math.min(
           VESTING_MAX,
-          Math.max(
-            0,
-            prev +
-              VESTING_PER_TURN +
-              sumDeltas([playerVesting, managerVesting, immediateMessage?.vesting, ...recurringVesting]),
-          ),
+          Math.max(0, prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting])),
         ),
       )
+
+      // The meters ease to their new widths over the next beat (see .meter-bar-fill's
+      // CSS transition) — the flash overlay and its sound land right as that motion
+      // starts, then a full second of quiet before the round's Slack message posts
+      // below, so the two updates read as sequential instead of competing for
+      // attention.
+      setMeterFlashKey((k) => k + 1)
+      playSound('gm-action-meter-up')
+
       setActivePlayerCard(null)
       setActiveManagerCard(null)
-
-      // A conversation plays out on its own timer (see runConversation) alongside
-      // the round loop, which always advances to the next round right away.
-      if (startedConversation) {
-        runConversation(startedConversation.channel, startedConversation.messages, 0)
-      }
       setRoundKey((k) => k + 1)
+
+      // Once per round, a random still-unused flavor message (or whole conversation)
+      // posts to its channel and nudges the meters same as a played card would. A
+      // conversation's deltas are applied message-by-message as it plays out instead
+      // of all at once here (see runConversation), so it's excluded below when picked.
+      // While a previously picked conversation is still posting, skip picking anything
+      // new this round — it resumes picking once that conversation finishes. Delayed a
+      // second behind the meter flash/sound above (see slackDelayTimers).
+      slackDelayTimers.current.push(
+        window.setTimeout(() => {
+          const picked = conversationInProgress.current ? null : pickSlackItem()
+          if (!picked) return
+          usedSlackItems.current.add(picked.key)
+          if (isSlackConversation(picked.item)) {
+            conversationInProgress.current = true
+            setActiveSlackChannel(picked.channel)
+            runConversation(picked.channel, picked.item.messages, 0)
+          } else {
+            const message = picked.item
+            postSlackMessage(picked.channel, message)
+            setBacklog((prev) => applyClearableDelta(prev, [message.backlog]))
+            setTechnicalDebt((prev) => applyClearableDelta(prev, [message.techDebt]))
+            setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + (message.burnout ?? 0))))
+            setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + (message.vesting ?? 0))))
+          }
+        }, 1000),
+      )
     }, 900)
 
     return () => clearTimeout(resolveTimer)
@@ -1050,7 +1048,13 @@ function GameBoard() {
           style={slackPanelWidth != null ? { flex: `0 0 ${slackPanelWidth}px`, minWidth: 0 } : undefined}
         >
           <div className="hud-panel">
-            <Meters backlog={backlog} technicalDebt={technicalDebt} burnout={burnout} vesting={vesting} />
+            <Meters
+              backlog={backlog}
+              technicalDebt={technicalDebt}
+              burnout={burnout}
+              vesting={vesting}
+              flashKey={meterFlashKey}
+            />
           </div>
         </div>
       </div>

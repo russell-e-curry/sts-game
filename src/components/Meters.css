@@ -151,6 +151,27 @@
   }
 }
 
+/* One-shot white flash over a meter's track, remounted (via its React key) each time
+   a round resolves — sits on top of the fill so it reads regardless of that bar's
+   own color or critical/celebrate pulse. */
+.meter-bar-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: meter-flash-burst 0.6s ease-out;
+}
+
+@keyframes meter-flash-burst {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 .meter-bar-value {
   font-size: 7.5cqh;
   font-weight: 700;

@@ -12,6 +12,7 @@ export type SoundName =
   | 'pc-action-flip-card'
   | 'gm-action-player-discard'
   | 'gm-action-slack-message'
+  | 'gm-action-meter-up'
 
 // A fresh Audio() per call (rather than one reused instance) so the same sound can
 // overlap or retrigger — e.g. two draws landing close together — without cutting
