@@ -17,6 +17,12 @@ export interface ResolvedRound {
   /** Set when this round's player card has action 'cancel' — neutralizes the
    * manager's card this same round and renders the CANCELLED overlay on it. */
   managerCardCancelled?: boolean
+  /** Turns left that a 'block recurring' card has suspended this round's manager
+   * recurring card for — undefined once it's no longer suspended. Renders the
+   * SUSPENDED overlay on the manager's card. */
+  managerCardSuspendedTurns?: number
+  /** Same as `managerCardSuspendedTurns`, for this round's player recurring card. */
+  playerCardSuspendedTurns?: number
 }
 
 interface BattleAreaProps {
@@ -183,10 +189,16 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
                   played
                   stopped={round.managerCardStopped}
                   cancelled={round.managerCardCancelled}
+                  suspendedTurns={round.managerCardSuspendedTurns}
                 />
               </div>
               <div className="battle-slot">
-                <Card card={round.playerCard} played stopped={round.playerCardStopped} />
+                <Card
+                  card={round.playerCard}
+                  played
+                  stopped={round.playerCardStopped}
+                  suspendedTurns={round.playerCardSuspendedTurns}
+                />
               </div>
             </div>
           ))}

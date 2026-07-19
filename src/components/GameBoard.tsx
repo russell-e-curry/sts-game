@@ -75,6 +75,10 @@ const PLAYER_FLIP_SOUND_DELAY_MS = 200
 // Matches .disintegrate-card's CSS animation duration (see DisintegrateEffect.css) —
 // how long a discarded card dissolves before its replacement starts drawing in.
 const DISCARD_DISINTEGRATE_DURATION_MS = 650
+// Gap between one meter's flash+sound landing and the next meter's turn starting in
+// the round-resolve cascade below — long enough for .meter-bar-fill's own 0.5s width
+// transition to finish before the next bar starts moving.
+const METER_STEP_DELAY_MS = 550
 const HAND_SIZE = 5
 const STARTING_BURNOUT = 0
 const STAT_MAX = 500
@@ -95,6 +99,13 @@ function sumDeltas(deltas: (number | undefined)[]) {
   return deltas.reduce<number>((sum, d) => sum + (d ?? 0), 0)
 }
 
+// Whether a round's contributing deltas would actually move a stat at all — used to
+// decide which meters get a flash+sound in the round-resolve effect below, so a
+// meter no card touched this round stays quiet instead of flashing for a no-op.
+function hasNonZeroDelta(deltas: (number | '*' | undefined)[]) {
+  return deltas.some((d) => d === '*' || (typeof d === 'number' && d !== 0))
+}
+
 interface RecurringEffect {
   roundId: string
   side: 'player' | 'manager'
@@ -107,6 +118,11 @@ interface RecurringEffect {
   // in the list (so the battle history can still point at the round it came from,
   // for the STOPPED overlay) but is excluded from every future delta calculation.
   stopped: boolean
+  // Turns left that a 'block recurring' effect has suspended this effect for — set
+  // (and reset) whenever a matching block card is played against it, ticked down by
+  // one at the end of every round, and excluded from delta calculations while > 0.
+  // Unlike `stopped`, this lapses on its own rather than lasting the rest of the game.
+  suspendedTurnsRemaining?: number
 }
 
 function GameBoard() {
@@ -144,11 +160,14 @@ function GameBoard() {
   const [technicalDebt, setTechnicalDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
   const [vesting, setVesting] = useState(0)
-  // Bumped once per resolved round, right as the meters get their new values — passed
-  // to Meters as a remount key for its flash overlay (see meter-bar-flash in
-  // Meters.css) so the flash restarts every round even though the meters themselves
-  // stay mounted the whole game.
-  const [meterFlashKey, setMeterFlashKey] = useState(0)
+  // Bumped independently for whichever meter just updated (see the round-resolve
+  // effect below, which flashes/updates the four one at a time) — passed to Meters as
+  // a remount key for that meter's flash overlay (see meter-bar-flash in Meters.css)
+  // so only the meter that actually changed this round flashes.
+  const [backlogFlashKey, setBacklogFlashKey] = useState(0)
+  const [technicalDebtFlashKey, setTechnicalDebtFlashKey] = useState(0)
+  const [burnoutFlashKey, setBurnoutFlashKey] = useState(0)
+  const [vestingFlashKey, setVestingFlashKey] = useState(0)
   const [roundKey, setRoundKey] = useState(0)
   // Set once backlog/technical debt/burnout hits its cap (lose) or vesting hits 100%
   // (win) — see the effect below. Also gates the round-start effect so the manager
@@ -209,11 +228,11 @@ function GameBoard() {
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
   const discardTimers = useRef<number[]>([])
-  // Holds the one-per-round timer that delays picking/posting the round's Slack
-  // message until a beat after the meter flash + gm-action-meter-up sound land (see
-  // the round-resolve effect below), so cleared on unmount/replay same as every
-  // other timer bucket.
-  const slackDelayTimers = useRef<number[]>([])
+  // Holds the per-round timers that cascade the meter flashes one at a time and then
+  // delay picking/posting the round's Slack message until a beat after the last one
+  // lands (see the round-resolve effect below), so cleared on unmount/replay same as
+  // every other timer bucket.
+  const meterSequenceTimers = useRef<number[]>([])
   const lockMessageTimer = useRef<number | null>(null)
   const roundCounter = useRef(0)
   // Gives every flight (manager play, player draw, manager draw) a unique React key
@@ -434,8 +453,8 @@ function GameBoard() {
       managerDrawTimers.current = []
       discardTimers.current.forEach((t) => clearTimeout(t))
       discardTimers.current = []
-      slackDelayTimers.current.forEach((t) => clearTimeout(t))
-      slackDelayTimers.current = []
+      meterSequenceTimers.current.forEach((t) => clearTimeout(t))
+      meterSequenceTimers.current = []
       conversationTimers.current.forEach((t) => clearTimeout(t))
       conversationTimers.current = []
       if (lockMessageTimer.current != null) clearTimeout(lockMessageTimer.current)
@@ -586,8 +605,8 @@ function GameBoard() {
     managerDrawTimers.current = []
     discardTimers.current.forEach((t) => clearTimeout(t))
     discardTimers.current = []
-    slackDelayTimers.current.forEach((t) => clearTimeout(t))
-    slackDelayTimers.current = []
+    meterSequenceTimers.current.forEach((t) => clearTimeout(t))
+    meterSequenceTimers.current = []
     conversationTimers.current.forEach((t) => clearTimeout(t))
     conversationTimers.current = []
     if (lockMessageTimer.current != null) clearTimeout(lockMessageTimer.current)
@@ -621,7 +640,10 @@ function GameBoard() {
     setTechnicalDebt(0)
     setBurnout(STARTING_BURNOUT)
     setVesting(0)
-    setMeterFlashKey(0)
+    setBacklogFlashKey(0)
+    setTechnicalDebtFlashKey(0)
+    setBurnoutFlashKey(0)
+    setVestingFlashKey(0)
     setRoundKey(0)
     setGameOver(null)
     setSlackMessages([])
@@ -726,6 +748,22 @@ function GameBoard() {
         const hasEligiblePlayerRecurringTarget = (type: string) =>
           activeRecurringEffects.current.some((e) => !e.stopped && e.side === 'player' && e.type === type)
 
+        // A 'block recurring' card carries no stat deltas of its own (see the damage
+        // heuristic below), so without this it would always score 0 and lose out to
+        // almost anything else in hand. It's only worth playing when there's an
+        // active, not-already-suspended player recurring effect it would actually
+        // suspend — matching `target`, or any type for '*'.
+        const hasEligibleBlockTarget = (c: ManagerCard) => {
+          if (c.effect !== 'block recurring' || !c.duration) return false
+          return activeRecurringEffects.current.some(
+            (e) =>
+              !e.stopped &&
+              e.side === 'player' &&
+              !((e.suspendedTurnsRemaining ?? 0) > 0) &&
+              (c.target === '*' || e.type === c.target),
+          )
+        }
+
         const handEntries = managerHand
           .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
           .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
@@ -751,11 +789,16 @@ function GameBoard() {
         // An eliminate card with something in hand eligible to eliminate takes
         // priority over raw damage — shutting down an active player recurring card
         // outweighs a one-off stat hit — and otherwise the manager plays whatever in
-        // hand would hurt the player most.
+        // hand would hurt the player most. A block-recurring card with something
+        // eligible to suspend gets the same priority treatment, one tier below
+        // eliminate (permanently stopping a recurring card beats temporarily pausing
+        // one, when both are available).
         const eligibleEliminate = handEntries.filter(
           (e) => e.card.action === 'eliminate' && hasEligiblePlayerRecurringTarget(e.card.type),
         )
-        const pool = eligibleEliminate.length > 0 ? eligibleEliminate : handEntries
+        const eligibleBlock = handEntries.filter((e) => hasEligibleBlockTarget(e.card))
+        const pool =
+          eligibleEliminate.length > 0 ? eligibleEliminate : eligibleBlock.length > 0 ? eligibleBlock : handEntries
         const chosen = pool.reduce((best, e) => (damage(e.card) > damage(best.card) ? e : best))
         const { card, id } = chosen
 
@@ -872,17 +915,53 @@ function GameBoard() {
       // anything either.
       const stoppedPlayerRoundId = cancelled ? null : findStoppedRoundId(activeManagerCard, 'player')
 
+      // A 'block recurring' card suspends every still-active OPPOSING-side recurring
+      // effect matching `target` (or every type, for '*') for `duration` turns —
+      // searched before this round's own recurring cards are registered below, so a
+      // recurring card played this same round can never be suspended by a block
+      // played alongside it. A neutralized manager card (cancelled or reversed away)
+      // never took effect, so it can't suspend anything either.
+      const applyBlockRecurring = (card: PlayerCard | ManagerCard, side: 'player' | 'manager', neutralized: boolean) => {
+        if (neutralized || card.effect !== 'block recurring' || !card.duration) return
+        const targetSide = side === 'player' ? 'manager' : 'player'
+        for (const effect of activeRecurringEffects.current) {
+          if (effect.stopped) continue
+          if (effect.side !== targetSide) continue
+          if (card.target !== '*' && effect.type !== card.target) continue
+          effect.suspendedTurnsRemaining = card.duration
+        }
+      }
+      applyBlockRecurring(activePlayerCard, 'player', false)
+      applyBlockRecurring(activeManagerCard, 'manager', cancelled || reversed)
+
+      // Snapshot of every still-suspended effect's remaining turns, keyed by the round
+      // it was originally played in, for the SUSPENDED overlay below and for excluding
+      // it from this round's own delta calculation further down — taken before that
+      // countdown ticks (see the decrement loop after liveRecurringEffects) so a
+      // duration-1 block still suspends its target for this round too.
+      const playerSuspensionMap = new Map(
+        activeRecurringEffects.current
+          .filter((e) => !e.stopped && e.side === 'player' && (e.suspendedTurnsRemaining ?? 0) > 0)
+          .map((e) => [e.roundId, e.suspendedTurnsRemaining!]),
+      )
+      const managerSuspensionMap = new Map(
+        activeRecurringEffects.current
+          .filter((e) => !e.stopped && e.side === 'manager' && (e.suspendedTurnsRemaining ?? 0) > 0)
+          .map((e) => [e.roundId, e.suspendedTurnsRemaining!]),
+      )
+
       setHistory((prev) => {
         const next = [
           ...prev,
           { id: roundId, playerCard: activePlayerCard, managerCard: activeManagerCard, managerCardCancelled: cancelled },
         ]
-        if (!stoppedManagerRoundId && !stoppedPlayerRoundId) return next
-        return next.map((r) => {
-          if (r.id === stoppedManagerRoundId) return { ...r, managerCardStopped: true }
-          if (r.id === stoppedPlayerRoundId) return { ...r, playerCardStopped: true }
-          return r
-        })
+        return next.map((r) => ({
+          ...r,
+          managerCardStopped: r.id === stoppedManagerRoundId ? true : r.managerCardStopped,
+          playerCardStopped: r.id === stoppedPlayerRoundId ? true : r.playerCardStopped,
+          managerCardSuspendedTurns: managerSuspensionMap.get(r.id),
+          playerCardSuspendedTurns: playerSuspensionMap.get(r.id),
+        }))
       })
 
       // Recurring cards register their own delta here so it keeps compounding on
@@ -953,66 +1032,132 @@ function GameBoard() {
             ? -(activeManagerCard.vesting ?? 0)
             : activeManagerCard.vesting ?? 0
 
-      const liveRecurringEffects = activeRecurringEffects.current.filter((e) => !e.stopped)
+      // A suspended effect (see applyBlockRecurring above) stays registered but
+      // contributes nothing while its countdown is still running.
+      const liveRecurringEffects = activeRecurringEffects.current.filter(
+        (e) => !e.stopped && !((e.suspendedTurnsRemaining ?? 0) > 0),
+      )
       const recurringBacklog = liveRecurringEffects.map((e) => e.backlog)
       const recurringTechnicalDebt = liveRecurringEffects.map((e) => e.technicalDebt)
       const recurringBurnout = liveRecurringEffects.map((e) => e.burnout)
       const recurringVesting = liveRecurringEffects.map((e) => e.vesting)
 
-      setBacklog((prev) => applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]))
-      setTechnicalDebt((prev) =>
-        applyClearableDelta(prev, [playerTechnicalDebt, managerTechnicalDebt, resetSentinel, ...recurringTechnicalDebt]),
-      )
-      setBurnout((prev) =>
-        Math.min(BURNOUT_MAX, Math.max(0, prev + sumDeltas([playerBurnout, managerBurnout, ...recurringBurnout]))),
-      )
-      // Vesting ticks up 1% every turn regardless of which cards were played, on top
-      // of whatever the cards themselves add or subtract.
-      setVesting((prev) =>
-        Math.min(
-          VESTING_MAX,
-          Math.max(0, prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting])),
-        ),
-      )
-
-      // The meters ease to their new widths over the next beat (see .meter-bar-fill's
-      // CSS transition) — the flash overlay and its sound land right as that motion
-      // starts, then a full second of quiet before the round's Slack message posts
-      // below, so the two updates read as sequential instead of competing for
-      // attention.
-      setMeterFlashKey((k) => k + 1)
-      playSound('gm-action-meter-up')
+      // Ticks every still-suspended effect's countdown down by one now that this
+      // round's SUSPENDED-overlay snapshot and delta exclusion have both already read
+      // the pre-tick value — once a counter reaches 0 the effect resumes contributing
+      // from next round on.
+      activeRecurringEffects.current.forEach((e) => {
+        if (e.suspendedTurnsRemaining && e.suspendedTurnsRemaining > 0) e.suspendedTurnsRemaining -= 1
+      })
 
       setActivePlayerCard(null)
       setActiveManagerCard(null)
       setRoundKey((k) => k + 1)
 
-      // Once per round, a random still-unused flavor message (or whole conversation)
-      // posts to its channel and nudges the meters same as a played card would. A
-      // conversation's deltas are applied message-by-message as it plays out instead
-      // of all at once here (see runConversation), so it's excluded below when picked.
-      // While a previously picked conversation is still posting, skip picking anything
-      // new this round — it resumes picking once that conversation finishes. Delayed a
-      // second behind the meter flash/sound above (see slackDelayTimers).
-      slackDelayTimers.current.push(
-        window.setTimeout(() => {
-          const picked = conversationInProgress.current ? null : pickSlackItem()
-          if (!picked) return
-          usedSlackItems.current.add(picked.key)
-          if (isSlackConversation(picked.item)) {
-            conversationInProgress.current = true
-            setActiveSlackChannel(picked.channel)
-            runConversation(picked.channel, picked.item.messages, 0)
-          } else {
-            const message = picked.item
-            postSlackMessage(picked.channel, message)
-            setBacklog((prev) => applyClearableDelta(prev, [message.backlog]))
-            setTechnicalDebt((prev) => applyClearableDelta(prev, [message.techDebt]))
-            setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + (message.burnout ?? 0))))
-            setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + (message.vesting ?? 0))))
-          }
-        }, 1000),
-      )
+      // Each meter that actually moved this round updates, flashes, and dings one at a
+      // time (in Backlog / Tech Debt / Burnout / Vesting order) rather than all at
+      // once — a meter untouched by anything this round is skipped outright. Once the
+      // whole cascade finishes, a full second of quiet passes before the round's Slack
+      // message posts below, so that update reads as its own separate beat.
+      const meterSteps: { changed: boolean; apply: () => void }[] = [
+        {
+          changed: hasNonZeroDelta([playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]),
+          apply: () => {
+            setBacklog((prev) =>
+              applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]),
+            )
+            setBacklogFlashKey((k) => k + 1)
+          },
+        },
+        {
+          changed: hasNonZeroDelta([
+            playerTechnicalDebt,
+            managerTechnicalDebt,
+            resetSentinel,
+            ...recurringTechnicalDebt,
+          ]),
+          apply: () => {
+            setTechnicalDebt((prev) =>
+              applyClearableDelta(prev, [
+                playerTechnicalDebt,
+                managerTechnicalDebt,
+                resetSentinel,
+                ...recurringTechnicalDebt,
+              ]),
+            )
+            setTechnicalDebtFlashKey((k) => k + 1)
+          },
+        },
+        {
+          changed: sumDeltas([playerBurnout, managerBurnout, ...recurringBurnout]) !== 0,
+          apply: () => {
+            setBurnout((prev) =>
+              Math.min(BURNOUT_MAX, Math.max(0, prev + sumDeltas([playerBurnout, managerBurnout, ...recurringBurnout]))),
+            )
+            setBurnoutFlashKey((k) => k + 1)
+          },
+        },
+        {
+          // Vesting ticks up 1% every turn regardless of which cards were played, on
+          // top of whatever the cards themselves add or subtract — so it only counts
+          // as unchanged if a card's own delta exactly cancels that baseline tick.
+          changed: VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting]) !== 0,
+          apply: () => {
+            setVesting((prev) =>
+              Math.min(
+                VESTING_MAX,
+                Math.max(0, prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting])),
+              ),
+            )
+            setVestingFlashKey((k) => k + 1)
+          },
+        },
+      ]
+
+      const runMeterStep = (index: number) => {
+        if (index >= meterSteps.length) {
+          // Once per round, a random still-unused flavor message (or whole
+          // conversation) posts to its channel and nudges the meters same as a played
+          // card would. A conversation's deltas are applied message-by-message as it
+          // plays out instead of all at once here (see runConversation), so it's
+          // excluded below when picked. While a previously picked conversation is
+          // still posting, skip picking anything new this round — it resumes picking
+          // once that conversation finishes.
+          meterSequenceTimers.current.push(
+            window.setTimeout(() => {
+              const picked = conversationInProgress.current ? null : pickSlackItem()
+              if (!picked) return
+              usedSlackItems.current.add(picked.key)
+              if (isSlackConversation(picked.item)) {
+                conversationInProgress.current = true
+                setActiveSlackChannel(picked.channel)
+                runConversation(picked.channel, picked.item.messages, 0)
+              } else {
+                const message = picked.item
+                postSlackMessage(picked.channel, message)
+                setBacklog((prev) => applyClearableDelta(prev, [message.backlog]))
+                setTechnicalDebt((prev) => applyClearableDelta(prev, [message.techDebt]))
+                setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + (message.burnout ?? 0))))
+                setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + (message.vesting ?? 0))))
+              }
+            }, 1000),
+          )
+          return
+        }
+
+        const step = meterSteps[index]
+        if (!step.changed) {
+          runMeterStep(index + 1)
+          return
+        }
+
+        step.apply()
+        playSound('gm-action-meter-up')
+        meterSequenceTimers.current.push(
+          window.setTimeout(() => runMeterStep(index + 1), METER_STEP_DELAY_MS),
+        )
+      }
+      runMeterStep(0)
     }, 900)
 
     return () => clearTimeout(resolveTimer)
@@ -1053,7 +1198,10 @@ function GameBoard() {
               technicalDebt={technicalDebt}
               burnout={burnout}
               vesting={vesting}
-              flashKey={meterFlashKey}
+              backlogFlashKey={backlogFlashKey}
+              technicalDebtFlashKey={technicalDebtFlashKey}
+              burnoutFlashKey={burnoutFlashKey}
+              vestingFlashKey={vestingFlashKey}
             />
           </div>
         </div>

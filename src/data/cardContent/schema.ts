@@ -15,6 +15,12 @@ export interface CardJson {
   burnout?: number
   /** Signed percentage delta applied to vesting. Omit if this card doesn't touch it. */
   vesting?: number
+  /** A secondary effect this card applies alongside its stat deltas, e.g. "block recurring" — combined with `target` and `duration`. Omit if this card has no secondary effect. */
+  effect?: string
+  /** Which recurring card type `effect` applies to, or '*' for every type. Omit if this card has no secondary effect. */
+  target?: string
+  /** Number of turns `effect` lasts. Omit if this card has no secondary effect. */
+  duration?: number
   /** Number of copies of this card included in the deck. Defaults to 1 if omitted. */
   count?: number
 }

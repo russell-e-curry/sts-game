@@ -18,6 +18,12 @@ interface CardBase {
   burnout?: number
   /** Signed percentage delta applied to vesting when this card resolves. Omitted if this card doesn't touch it. */
   vesting?: number
+  /** A secondary effect this card applies alongside its stat deltas, e.g. "block recurring" — combined with `target` and `duration`. Omitted if this card has no secondary effect. */
+  effect?: string
+  /** Which recurring card type `effect` applies to, or '*' for every type. Omitted if this card has no secondary effect. */
+  target?: string
+  /** Number of turns `effect` lasts. Omitted if this card has no secondary effect. */
+  duration?: number
 }
 
 // `side` is a discriminant so a PlayerCard can never be typed as (or passed where

@@ -18,6 +18,8 @@ interface CardProps<T extends GameCard> {
   stopped?: boolean
   /** True once a 'cancel' card played the same round has neutralized this card — renders a striped overlay, same idea as `stopped` but from a same-round cancel rather than a later-round eliminate. */
   cancelled?: boolean
+  /** Turns left that a 'block recurring' card has suspended this recurring card for — renders a striped overlay (and the countdown) and pauses the recurring glow, same idea as `stopped` but temporary rather than permanent. Undefined/0 means not suspended. */
+  suspendedTurns?: number
   onPointerDown?: (e: PointerEvent, card: T) => void
 }
 
@@ -47,8 +49,10 @@ function Card<T extends GameCard>({
   played,
   stopped,
   cancelled,
+  suspendedTurns,
   onPointerDown,
 }: CardProps<T>) {
+  const suspended = !!suspendedTurns && suspendedTurns > 0
   const [hovered, setHovered] = useState(false)
   const [clicked, setClicked] = useState(false)
   const [artFailed, setArtFailed] = useState(false)
@@ -168,7 +172,7 @@ function Card<T extends GameCard>({
   return (
     <div
       ref={rootRef}
-      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !cancelled ? ' game-card-recurring' : ''}`}
+      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !cancelled && !suspended ? ' game-card-recurring' : ''}`}
       style={style}
       onPointerDown={onPointerDown ? (e) => onPointerDown(e, card) : undefined}
       onMouseEnter={handleMouseEnter}
@@ -258,6 +262,14 @@ function Card<T extends GameCard>({
       {cancelled && (
         <div className="game-card-cancelled-overlay">
           <span className="game-card-cancelled-label">CANCELLED</span>
+        </div>
+      )}
+      {suspended && (
+        <div className="game-card-suspended-overlay">
+          <span className="game-card-suspended-label">SUSPENDED</span>
+          <span className="game-card-suspended-turns">
+            {suspendedTurns} turn{suspendedTurns === 1 ? '' : 's'} left
+          </span>
         </div>
       )}
     </div>
