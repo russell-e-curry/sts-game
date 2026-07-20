@@ -23,6 +23,21 @@
   }
 }
 
+/* This component is now mounted for the entire game (see GameBoard.tsx), not just
+   once there's a result, so its two <video> elements exist early enough to be primed
+   for iPadOS Safari (see GameOverScreen.tsx) — this is what keeps it invisible and
+   inert for the rest of the game until that actually happens. opacity (not
+   visibility or display) is deliberate: those more aggressively hide an element from
+   the renderer, which risks Safari also throttling a hidden <video>'s decode
+   pipeline enough that the priming .play() call doesn't count as a real one.
+   animation: none overrides the fade-in above so it doesn't play (invisibly) the
+   moment the whole game mounts — it should only run once this class is removed. */
+.game-over-screen-hidden {
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+}
+
 .game-over-screen-win {
   background:
     radial-gradient(ellipse at top, rgba(212, 160, 23, 0.35), transparent 60%),

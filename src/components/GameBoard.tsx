@@ -1518,7 +1518,10 @@ function GameBoard() {
       }
     >
       {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
-      {gameOver && <GameOverScreen result={gameOver} onRestart={startNewGame} />}
+      {/* Always mounted (not just once gameOver is set) so its win/lose <video>
+          elements exist in time to be primed by the session's first tap/click — see
+          GameOverScreen's own comment for why that timing matters on iPadOS. */}
+      <GameOverScreen result={gameOver} onRestart={startNewGame} />
 
       <div className="top-bar-manager">
         <div className="side-row">
