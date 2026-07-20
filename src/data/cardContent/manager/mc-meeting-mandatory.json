@@ -1,6 +1,6 @@
 {
   "title": "Mandatory Meeting",
-  "type": "meeting",
+  "category": "meetings",
   "action": "one time",
   "description": "None of us is as dumb as all of us, and you just picked up some more work.",
   "backlog": -20,

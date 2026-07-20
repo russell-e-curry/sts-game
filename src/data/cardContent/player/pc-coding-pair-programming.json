@@ -1,6 +1,6 @@
 {
   "title": "Pair Programming",
-  "type": "coding",
+  "category": "coding",
   "action": "one time",
   "description": "Two developers, one keyboard, fuck this clown - we're not using emacs today.",
   "backlog": -25,

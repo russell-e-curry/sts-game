@@ -1,6 +1,6 @@
 {
   "title": "Sick Day",
-  "type": "wellness",
+  "category": "wellness",
   "action": "one time",
   "description": "The doctor says you should drink more beer, also, you'll be calling yourself \"The Doctor\" from now on.",
   "burnout": -25

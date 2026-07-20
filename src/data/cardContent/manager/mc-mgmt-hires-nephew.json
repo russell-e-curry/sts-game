@@ -1,6 +1,6 @@
 {
   "title": "The Boss's Nephew",
-  "type": "management",
+  "category": "management",
   "action": "character",
   "character" : "boss' nephew",
   "description": "Your boss hires his slob nephew, who has no skills apart from spilling food on his shirt.",

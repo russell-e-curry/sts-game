@@ -1,8 +1,8 @@
 {
   "title": "Rubber Duck",
-  "type": "wellness",
+  "category": "wellness",
   "action": "one time",
   "description": "Talk it through with the duck. Come up with some new ideas.",
-  "technicalDebt": -25,
+  "techDebt": -25,
   "burnout": -25
 }

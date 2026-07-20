@@ -1,6 +1,6 @@
 {
   "title": "Nepotism",
-  "type": "coding",
+  "category": "coding",
   "action": "one time",
   "character": "boss' nephew",
   "description": "Your boss' slob nephew invents his own CI/CD platform, the boss wants it implemented asap.",

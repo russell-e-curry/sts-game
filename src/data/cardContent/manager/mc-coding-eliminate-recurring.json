@@ -1,6 +1,6 @@
 {
   "title": "Budget Cut",
-  "type": "coding",
+  "category": "coding",
   "action": "eliminate",
   "description": "Your boss cuts the budget, eliminating one of your recurring cards."
 }

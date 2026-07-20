@@ -1,6 +1,6 @@
 {
   "title": "Standup Meeting",
-  "type": "meeting",
+  "category": "meetings",
   "action": "one time",
   "description": "Fifteen minutes that are actually forty. Say the same shit you said yesterday, but wave your hands differently.",
   "burnout": 10

@@ -1,8 +1,8 @@
 {
   "title": "Team Building",
-  "type": "wellness",
+  "category": "wellness",
   "action": "one time",
   "description": "The problem with carnival rides? They're assembled by carnies. Looks like you'll be needing a new web developer.",
-  "technicalDebt": 100,
+  "techDebt": 100,
   "backlog" : 25
 }

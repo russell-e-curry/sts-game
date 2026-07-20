@@ -1,6 +1,6 @@
 {
   "title": "Add Unit Tests",
-  "type": "coding",
+  "category": "coding",
   "action": "recurring",
   "description": "The PM needs 90% coverage by the end of the quarter, you need a new job.",
   "backlog": 10,

@@ -1,6 +1,6 @@
 {
   "title": "Chief Financial Officer",
-  "type": "management",
+  "category": "management",
   "action": "character",
   "character" : "CFO",
   "description": "The CFO stops all work for an audit, your recurring cards are blocked for 3 turns.",

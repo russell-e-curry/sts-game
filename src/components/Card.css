@@ -222,7 +222,7 @@
   background: linear-gradient(160deg, #f2f3f5, #c7cbd1);
 }
 
-.game-card-template-recurring .game-card-type,
+.game-card-template-recurring .game-card-category,
 .game-card-template-recurring .game-card-action,
 .game-card-template-recurring .game-card-name {
   color: #000;
@@ -302,7 +302,7 @@
   background: linear-gradient(160deg, #ffd76a, #d4a017);
 }
 
-.game-card-template-character .game-card-type,
+.game-card-template-character .game-card-category,
 .game-card-template-character .game-card-action,
 .game-card-template-character .game-card-name {
   color: #23242c;
@@ -323,7 +323,7 @@
   gap: 4cqw;
 }
 
-.game-card-type,
+.game-card-category,
 .game-card-action {
   font-size: 5.33cqw;
   text-transform: uppercase;

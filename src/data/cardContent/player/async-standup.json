@@ -1,6 +1,6 @@
 {
   "title": "Async Standup",
-  "type": "meeting",
+  "category": "meetings",
   "action": "one time",
   "description": "Draw 1 card.",
   "backlog": 30,

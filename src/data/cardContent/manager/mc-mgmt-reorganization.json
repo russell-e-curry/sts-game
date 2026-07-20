@@ -1,8 +1,8 @@
 {
   "title": "Reorganization",
-  "type": "management",
+  "category": "management",
   "action": "one time",
   "description": "New org chart, same broken code. Nobody knows who owns what anymore, least of all you.",
-  "technicalDebt": 100,
+  "techDebt": 100,
   "burnout": 25
 }

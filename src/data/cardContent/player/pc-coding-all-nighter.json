@@ -1,9 +1,9 @@
 {
   "title": "All Nighter",
-  "type": "coding",
+  "category": "coding",
   "action": "one time",
   "description": "Six energy drinks and a broken circadian rhythm later, the backlog's looking better - you are not.",
   "backlog": -25,
-  "technicalDebt": 40,
+  "techDebt": 40,
   "burnout": 15
 }

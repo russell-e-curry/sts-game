@@ -1,6 +1,6 @@
 {
   "title": "Refactor the Monolith",
-  "type": "coding",
+  "category": "coding",
   "action": "one time",
   "description": "Your manager just learned about microservices, clusterfuck ahoy!",
   "backlog": 50,

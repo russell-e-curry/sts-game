@@ -181,7 +181,7 @@ function Card<T extends GameCard>({
     >
       <div className={`game-card-template${actionTemplateClass}`}>
         <div className="game-card-header">
-          <span className="game-card-type">{card.type}</span>
+          <span className="game-card-category">{card.category}</span>
           <span className="game-card-action">{card.action}</span>
         </div>
         <p className="game-card-name">{card.title}</p>
@@ -205,7 +205,7 @@ function Card<T extends GameCard>({
         </div>
         {card.action !== 'reset' && card.action !== 'cancel' && (
           <div className="game-card-footer">
-            {card.type === 'reversal' ? (
+            {card.action === 'reversal' ? (
               <span className="game-card-stat game-card-stat-slot-center game-card-stat-color-vesting">
                 Reverse manager's card
               </span>
@@ -217,11 +217,11 @@ function Card<T extends GameCard>({
                   >
                     Backlog {card.backlog === '*' ? 'Reset' : card.backlog}
                   </span>
-                ) : card.technicalDebt !== undefined ? (
+                ) : card.techDebt !== undefined ? (
                   <span
-                    className={`game-card-stat game-card-stat-slot-left ${card.technicalDebt === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-techdebt'}`}
+                    className={`game-card-stat game-card-stat-slot-left ${card.techDebt === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-techdebt'}`}
                   >
-                    Tech Debt {card.technicalDebt === '*' ? 'Reset' : card.technicalDebt}
+                    Tech Debt {card.techDebt === '*' ? 'Reset' : card.techDebt}
                   </span>
                 ) : card.vesting !== undefined && card.burnout !== undefined ? (
                   <span className="game-card-stat game-card-stat-slot-left game-card-stat-color-vesting">
@@ -244,7 +244,11 @@ function Card<T extends GameCard>({
         )}
         {card.action === 'eliminate' && (
           <div className="game-card-eliminate-badge">
-            {card.character ? `Eliminate the ${card.character}` : 'Stop a Recurring Card'}
+            {card.target?.startsWith('character:')
+              ? `Eliminate ${card.target.slice('character:'.length).toUpperCase()}`
+              : card.character
+                ? `Eliminate the ${card.character}`
+                : 'Stop a Recurring Card'}
           </div>
         )}
         {card.action === 'reset' && (
@@ -268,7 +272,7 @@ function Card<T extends GameCard>({
         <div className="game-card-suspended-overlay">
           <span className="game-card-suspended-label">SUSPENDED</span>
           <span className="game-card-suspended-turns">
-            {suspendedTurns} turn{suspendedTurns === 1 ? '' : 's'} left
+            {Number.isFinite(suspendedTurns) ? `${suspendedTurns} turn${suspendedTurns === 1 ? '' : 's'} left` : 'Rest of the game'}
           </span>
         </div>
       )}

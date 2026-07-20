@@ -1,6 +1,6 @@
 {
   "title": "Blame the Intern",
-  "type": "meeting",
+  "category": "meetings",
   "action": "one time",
   "description": "You're blocked on some requirements you forgot to foist on the intern. That's okay, sleep is for closers only.",
   "backlog" : -25,

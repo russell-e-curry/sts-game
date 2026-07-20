@@ -1,9 +1,9 @@
 {
   "title": "Web Development",
-  "type": "coding",
+  "category": "coding",
   "action": "recurring",
   "character" : "web developer",
   "description": "You can reduce the front-end codebase size by 20% if you get rid of the letter 'e'. Get the Web Developer on this asap.",
   "backlog": -5,
-  "technicalDebt": -5
+  "techDebt": -5
 }

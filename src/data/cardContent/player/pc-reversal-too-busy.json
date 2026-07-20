@@ -1,6 +1,6 @@
 {
   "title": "Too Busy",
-  "type": "reversal",
-  "action": "one time",
+  "category": "meetings",
+  "action": "reversal",
   "description": "Maybe next quarter, you're fully booked and have the fantasy roadmap to prove it."
 }

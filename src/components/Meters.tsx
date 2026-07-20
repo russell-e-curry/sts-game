@@ -2,7 +2,7 @@ import './Meters.css'
 
 interface MetersProps {
   backlog: number
-  technicalDebt: number
+  techDebt: number
   burnout: number
   vesting: number
   // Bumped independently for whichever meter just changed (see GameBoard's
@@ -10,9 +10,20 @@ interface MetersProps {
   // one-shot CSS animation restarts, even though the meters themselves stay mounted
   // the whole game. Undefined/0 renders no overlay at all.
   backlogFlashKey?: number
-  technicalDebtFlashKey?: number
+  techDebtFlashKey?: number
   burnoutFlashKey?: number
   vestingFlashKey?: number
+  // True once this meter has actually hit its cap and its turn has come up in the
+  // game-over glow cascade (see runLossSequence in GameBoard) — holds a bright pulsing
+  // glow rather than a one-shot flash, since it stays lit right through the game-over
+  // fade-in rather than resetting.
+  backlogMaxed?: boolean
+  techDebtMaxed?: boolean
+  burnoutMaxed?: boolean
+  // Same idea as the danger-stat *Maxed props above, but for vesting hitting 100% (a
+  // win) — set once its turn comes up in the game-over glow cascade (see
+  // runWinSequence in GameBoard) and left on through the game-over fade-in.
+  vestingMaxed?: boolean
 }
 
 const STAT_MAX = 500
@@ -30,16 +41,20 @@ const CRITICAL_THRESHOLD = 80
 
 function Meters({
   backlog,
-  technicalDebt,
+  techDebt,
   burnout,
   vesting,
   backlogFlashKey,
-  technicalDebtFlashKey,
+  techDebtFlashKey,
   burnoutFlashKey,
   vestingFlashKey,
+  backlogMaxed,
+  techDebtMaxed,
+  burnoutMaxed,
+  vestingMaxed,
 }: MetersProps) {
   const backlogPct = pct(backlog, STAT_MAX)
-  const technicalDebtPct = pct(technicalDebt, STAT_MAX)
+  const techDebtPct = pct(techDebt, STAT_MAX)
   const burnoutPct = pct(burnout, BURNOUT_MAX)
   const vestingPct = pct(vesting, VESTING_MAX)
 
@@ -53,7 +68,7 @@ function Meters({
           </div>
           <div className="meter-bar-track">
             <div
-              className={`meter-bar-fill meter-bar-fill-backlog${backlogPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}`}
+              className={`meter-bar-fill meter-bar-fill-backlog${backlogPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}${backlogMaxed ? ' meter-bar-fill-maxed' : ''}`}
               style={{ width: `${backlogPct}%` }}
             />
             {!!backlogFlashKey && <div key={backlogFlashKey} className="meter-bar-flash" />}
@@ -63,14 +78,14 @@ function Meters({
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Tech Debt</span>
-            <span className="meter-bar-value meter-bar-value-techdebt">{technicalDebtPct}%</span>
+            <span className="meter-bar-value meter-bar-value-techdebt">{techDebtPct}%</span>
           </div>
           <div className="meter-bar-track">
             <div
-              className={`meter-bar-fill meter-bar-fill-techdebt${technicalDebtPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}`}
-              style={{ width: `${technicalDebtPct}%` }}
+              className={`meter-bar-fill meter-bar-fill-techdebt${techDebtPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}${techDebtMaxed ? ' meter-bar-fill-maxed' : ''}`}
+              style={{ width: `${techDebtPct}%` }}
             />
-            {!!technicalDebtFlashKey && <div key={technicalDebtFlashKey} className="meter-bar-flash" />}
+            {!!techDebtFlashKey && <div key={techDebtFlashKey} className="meter-bar-flash" />}
           </div>
         </div>
       </div>
@@ -83,7 +98,7 @@ function Meters({
           </div>
           <div className="meter-bar-track">
             <div
-              className={`meter-bar-fill meter-bar-fill-burnout${burnoutPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}`}
+              className={`meter-bar-fill meter-bar-fill-burnout${burnoutPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-critical' : ''}${burnoutMaxed ? ' meter-bar-fill-maxed' : ''}`}
               style={{ width: `${burnoutPct}%` }}
             />
             {!!burnoutFlashKey && <div key={burnoutFlashKey} className="meter-bar-flash" />}
@@ -97,7 +112,7 @@ function Meters({
           </div>
           <div className="meter-bar-track">
             <div
-              className={`meter-bar-fill meter-bar-fill-vesting${vestingPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-celebrate' : ''}`}
+              className={`meter-bar-fill meter-bar-fill-vesting${vestingPct >= CRITICAL_THRESHOLD ? ' meter-bar-fill-celebrate' : ''}${vestingMaxed ? ' meter-bar-fill-maxed' : ''}`}
               style={{ width: `${vestingPct}%` }}
             />
             {!!vestingFlashKey && <div key={vestingFlashKey} className="meter-bar-flash" />}

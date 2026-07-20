@@ -1,6 +1,6 @@
 {
   "title": "Async Update",
-  "type": "meeting",
+  "category": "meetings",
   "action": "one time",
   "description": "Post your status in the channel instead of showing up live. Nobody reads it, but nobody can prove you weren't working.",
   "backlog": 25,

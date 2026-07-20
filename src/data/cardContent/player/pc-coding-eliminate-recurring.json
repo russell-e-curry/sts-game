@@ -1,6 +1,6 @@
 {
   "title": "Drop Recurring Task",
-  "type": "coding",
+  "category": "coding",
   "action": "eliminate",
   "description": "Eliminate the last recurring coding card your boss played."
 }
