@@ -106,6 +106,36 @@ const BATTLE_SLOT_GAP = 12 // .active-column/.battle-column-history's gap, betwe
 const HISTORY_PANEL_PADDING_TOP = 8
 const HISTORY_PANEL_PADDING_BOTTOM = 24 // extra bottom padding for the history scrollbar's gutter
 const BOTTOM_BAR_PADDING = 16 // .bottom-bar's padding-bottom, extra clearance below the player's hand
+// Reserved height below each hand row for its horizontal scrollbar (see
+// HAND_CARD_BREAKPOINTS below) — matches the thin scrollbar's height in
+// Hand.css/ManagerHand.css so the scrollbar sits in this gutter rather than
+// eating into the card's own height. Reserved unconditionally (even at the widest
+// breakpoint, where nothing overflows and no scrollbar actually renders) so a row's
+// height doesn't jump when the window crosses a breakpoint and starts/stops
+// overflowing.
+const HAND_SCROLLBAR_GUTTER = 10
+// How many hand cards are visible without scrolling (the rest reachable by
+// scrolling — see .hand/.manager-hand's overflow-x in Hand.css/ManagerHand.css) at
+// a given viewport width. Widths are picked off common device breakpoints: 1600 is
+// roughly where 1080p+ desktop monitors have room for all 5 cards at a readable
+// size; 1280 covers typical laptops (1366x768 and up, minus browser chrome); 1024
+// covers iPad landscape and small laptops; below 768 (iPad portrait and phones)
+// floors out at 2 so cards never shrink past legibility — scrolling handles the
+// rest of the hand from there down instead of cards getting smaller still.
+const HAND_CARD_BREAKPOINTS: [minWidth: number, cards: number][] = [
+  [1600, 5],
+  [1280, 4],
+  [1024, 3],
+  [768, 2],
+]
+const MIN_VISIBLE_HAND_CARDS = 2
+
+function visibleHandCardsForWidth(width: number) {
+  for (const [minWidth, cards] of HAND_CARD_BREAKPOINTS) {
+    if (width >= minWidth) return cards
+  }
+  return MIN_VISIBLE_HAND_CARDS
+}
 
 // Backlog/technical debt deltas are normally additive, but any contributing card can
 // instead carry '*' to wipe the stat to 0 outright (e.g. a reorg clearing the
@@ -259,6 +289,10 @@ function GameBoard() {
   // than compounding on the previous frame's already-shrunk one.
   const [cardScale, setCardScale] = useState(1)
   const cardScaleRef = useRef(1)
+  // How many cards each hand shows before the rest scroll off (see
+  // HAND_CARD_BREAKPOINTS) — lazily initialized from the real viewport width so the
+  // very first paint already picks the right tier instead of flashing 5-wide first.
+  const [visibleHandCards, setVisibleHandCards] = useState(() => visibleHandCardsForWidth(window.innerWidth))
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
   const slackMessageCounter = useRef(0)
@@ -656,7 +690,12 @@ function GameBoard() {
       // row 2/row 3's actual height on any viewport where cardScale < 1, clipping the
       // manager's card off the top of the (bottom-anchored) history area.
       const rowChromeHeight =
-        BOARD_ROW_GAP * 2 + BOTTOM_BAR_PADDING + BATTLE_SLOT_GAP + HISTORY_PANEL_PADDING_TOP + HISTORY_PANEL_PADDING_BOTTOM
+        BOARD_ROW_GAP * 2 +
+        BOTTOM_BAR_PADDING +
+        BATTLE_SLOT_GAP +
+        HISTORY_PANEL_PADDING_TOP +
+        HISTORY_PANEL_PADDING_BOTTOM +
+        HAND_SCROLLBAR_GUTTER * 2
       // document.documentElement, not boardEl: .game-board has no explicit height of
       // its own (it hugs whatever these rows resolve to), so measuring it here would
       // just measure the answer we're trying to compute. #root fills the viewport
@@ -671,11 +710,12 @@ function GameBoard() {
       const cardHeight = naturalCardHeight * nextScale
       cardScaleRef.current = nextScale
       setCardScale(nextScale)
+      setVisibleHandCards(visibleHandCardsForWidth(window.innerWidth))
       setColumn1Width(Math.min(naturalWidth * nextScale, availableWidth))
       setRowHeights([
-        cardHeight,
+        cardHeight + HAND_SCROLLBAR_GUTTER,
         cardHeight * 2 + BATTLE_SLOT_GAP + HISTORY_PANEL_PADDING_TOP + HISTORY_PANEL_PADDING_BOTTOM,
-        cardHeight + BOTTOM_BAR_PADDING,
+        cardHeight + BOTTOM_BAR_PADDING + HAND_SCROLLBAR_GUTTER,
       ])
     }
     recompute()
@@ -1473,6 +1513,7 @@ function GameBoard() {
             gridTemplateRows: `${rowHeights[0]}px ${rowHeights[1]}px ${rowHeights[2]}px`,
           }),
           '--card-scale': cardScale,
+          '--visible-hand-cards': visibleHandCards,
         } as CSSProperties
       }
     >

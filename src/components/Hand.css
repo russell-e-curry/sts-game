@@ -1,6 +1,11 @@
+/* width: max-content (rather than the flex-container shrink-to-fit sizing this
+   already had by default) makes it explicit: .hand-wrap (see GameBoard.css) caps
+   how many cards' worth of width is visible without scrolling, so this has to stay
+   pinned to its own natural content width (all HAND_SIZE slots, full size) instead
+   of shrinking to match — otherwise the extra cards would get squeezed into the
+   wrapper's box instead of scrolling into view. */
 .hand {
-  flex: 1 1 auto;
-  min-width: 0;
+  width: max-content;
   height: 100%;
   display: flex;
   align-items: center;
@@ -28,8 +33,7 @@
    measures the actual overflow (in both axes) and hands back a scale to shrink
    into. */
 .hand-slot {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   height: calc(var(--card-scale, 1) * calc(12vw * 7 / 5));
   aspect-ratio: 5 / 7;
   box-sizing: border-box;

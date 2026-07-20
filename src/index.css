@@ -83,11 +83,20 @@ body {
   overflow: hidden;
 }
 
+/* justify-content: center (not the flex default, flex-start) — .game-board (this
+   flex column's only child) is deliberately NOT flex: 1: its grid rows are sized in
+   JS to exactly fit the cards at whatever scale the viewport allows (see
+   GameBoard.tsx's cardScale/rowHeights), not stretched to fill leftover space. On a
+   viewport where width, not height, is what's actually forcing that scale down
+   (e.g. a narrow-but-tall window), the resulting board is shorter than the
+   viewport — center it in the remaining vertical space instead of leaving it
+   pinned to the top with a dead gap growing below it as the window narrows. */
 #root {
   width: 100%;
   height: 100svh;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   box-sizing: border-box;
   background:
     radial-gradient(ellipse at top, rgba(122, 31, 214, 0.25), transparent 60%),

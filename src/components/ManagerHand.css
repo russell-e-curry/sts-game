@@ -1,7 +1,13 @@
 /* No width: 100% — that only resolves against a definite parent width, and
-   .top-bar-manager (see GameBoard.css) now sizes itself to fit this row rather than
-   the other way around. Left unset, this sizes naturally to its 5 slots. */
+   .top-bar-manager (see GameBoard.css) sizes itself off .manager-hand-wrap's own
+   (capped) width instead. width: max-content makes this row's own sizing explicit:
+   .manager-hand-wrap now caps how many cards are visible without scrolling (see
+   --visible-hand-cards in GameBoard.tsx), so this has to stay pinned to its natural
+   content width (all 5 slots, full size) instead of shrinking to match, or the
+   extra cards would get squeezed into the wrapper's box instead of scrolling into
+   view. */
 .manager-hand {
+  width: max-content;
   height: 100%;
   display: flex;
   align-items: center;
