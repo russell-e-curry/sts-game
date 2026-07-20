@@ -1,6 +1,6 @@
-/* The outer box (.hand-slot's dashed border/sizing — see Hand.css) is shared with the
-   other five hand slots so this reads as part of the same row; this file only styles
-   the icon/label content and the drag-over highlight. */
+/* The outer box (.discard-column's dashed border/sizing — see BattleArea.css) lives
+   in the board's middle column, below the dropzone; this file only styles the
+   icon/label content and the drag-over highlight. */
 .discard-zone-content {
   width: 100%;
   height: 100%;
@@ -28,7 +28,7 @@
 /* Reuses the same .game-board-dragging flag that already suppresses stray hover
    elsewhere while a card's in flight (see GameBoard.css) to cue where a dragged
    card can be dropped, without needing pointer-tracked hover state of its own. */
-.game-board-dragging .hand-slot.discard-zone {
+.game-board-dragging .discard-column {
   border-color: rgba(255, 110, 110, 0.65);
   background-color: rgba(255, 80, 80, 0.08);
 }

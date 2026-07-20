@@ -1,7 +1,6 @@
 import type { PointerEvent } from 'react'
 import type { PlayerCard } from '../types'
 import Card from './Card'
-import DiscardZone from './DiscardZone'
 import './Hand.css'
 
 interface HandProps {
@@ -30,11 +29,6 @@ function Hand({ cards, draggingCardId, lockedCardIds, onCardPointerDown }: HandP
           )}
         </div>
       ))}
-      {/* Permanent sixth slot — never part of `cards`, never dealt into, just a drop
-          target for discarding (see GameBoard's handleDiscardCard). */}
-      <div className="hand-slot discard-zone">
-        <DiscardZone />
-      </div>
     </div>
   )
 }

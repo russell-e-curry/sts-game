@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
 import type { ManagerCard, PlayerCard } from '../types'
 import Card from './Card'
+import DiscardZone from './DiscardZone'
 import SparkleBurst from './SparkleBurst'
 import './BattleArea.css'
 
@@ -29,10 +30,6 @@ interface BattleAreaProps {
   history: ResolvedRound[]
   activePlayerCard: PlayerCard | null
   activeManagerCard: ManagerCard | null
-  /** Pinned to the same measured width as .top-bar-manager (see GameBoard.tsx) so the
-   * played-card history lines up with the manager's hand row above it. The active
-   * dropzone is a separate column and isn't sized off this. */
-  historyWidth?: number | null
   /** Briefly shown in the player's active-column slot when a locked card is dropped
    * there instead of played (see GameBoard's showLockMessage). */
   lockMessage?: string | null
@@ -41,7 +38,7 @@ interface BattleAreaProps {
 const MIN_THUMB_WIDTH = 40
 
 const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleArea(
-  { history, activePlayerCard, activeManagerCard, historyWidth, lockMessage },
+  { history, activePlayerCard, activeManagerCard, lockMessage },
   activeSlotRef,
 ) {
   const historyRowRef = useRef<HTMLDivElement>(null)
@@ -161,13 +158,10 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
   return (
     <>
       {/* The "battle area" — where played cards end up, as opposed to .active-column
-          below, which is where a card sits while it's actually being played. Pinned
-          to historyWidth so it lines up with the manager's hand row. */}
-      <div
-        className="history-panel"
-        ref={historyRowRef}
-        style={historyWidth != null ? { width: historyWidth } : undefined}
-      >
+          below, which is where a card sits while it's actually being played. Shares
+          its grid column with the manager/player hand rows (see GameBoard.css), so it
+          lines up with them without any measuring. */}
+      <div className="history-panel" ref={historyRowRef}>
         <div
           className="history-track"
           ref={historyTrackRef}
@@ -220,9 +214,9 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
         </div>
       </div>
 
-      {/* Its own column in .battle-row (see GameBoard.css), separate from
-          .history-panel — sized to just fit a card, not pinned to any measured
-          width. */}
+      {/* The board's middle column, first cell (see GameBoard.css) — aligned to the
+          history row, separate from .history-panel, sized to just fit a card. Stacks
+          the manager's and player's active-card slots. */}
       <div className="active-column">
         <div className="battle-slot" ref={activeSlotRef}>
           {activeManagerCard ? (
@@ -247,6 +241,12 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
             </div>
           )}
         </div>
+      </div>
+
+      {/* The board's middle column, second cell — aligned to the player-hand row,
+          directly below .active-column. */}
+      <div className="discard-column discard-zone">
+        <DiscardZone />
       </div>
     </>
   )

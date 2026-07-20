@@ -9,10 +9,14 @@
   min-height: 0;
 }
 
-/* Sized to roughly match a card slot's height (see Hand.css), capped by the band. */
+/* Sized to match a card slot's height exactly (see Hand.css's .hand-slot — 12vw *
+   7/5 is the same value as 16.8vw, just written out) so the deck lines up with the
+   hand instead of sitting oversized or undersized next to it. --card-scale (see
+   Hand.css's .hand-slot) applies here too, so the deck shrinks in step with the
+   hand. */
 .deck-stack {
   position: relative;
-  height: min(88%, 16.8vw);
+  height: calc(var(--card-scale, 1) * 16.8vw);
   aspect-ratio: 158 / 218;
   width: auto;
 }

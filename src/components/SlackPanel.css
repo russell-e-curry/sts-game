@@ -1,7 +1,7 @@
-/* Fills whatever's left of .battle-row next to .game-column (see GameBoard.css),
-   which is now pinned to the manager's hand-row width instead of sharing space here. */
+/* Sits in the board's third grid column, alongside the meters panel and copyright
+   notice above/below it (see GameBoard.css) — stretches to fill that column's width
+   and this row's height by default, same as any other grid cell. */
 .slack-panel {
-  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;

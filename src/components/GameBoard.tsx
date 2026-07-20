@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import type { ManagerCard, PlayerCard } from '../types'
 import { sampleHand } from '../data/cards'
 import { sampleManagerCards } from '../data/managerCards'
@@ -90,6 +90,22 @@ const STAT_MAX = 500
 const BURNOUT_MAX = 1000
 const VESTING_MAX = 100
 const VESTING_PER_TURN = 1
+// These match .game-board's grid-template-columns/gap/padding in GameBoard.css — read
+// by the column1Width/cardScale effect below to figure out how much width is
+// actually left for column 1 once column 3's floor and the grid's own gaps/padding
+// are accounted for.
+const COLUMN3_MIN_WIDTH = 200
+const BOARD_COLUMN_GAP = 20
+const BOARD_ROW_GAP = 20
+const BOARD_PADDING = 20
+// The rest of these match the fixed chrome around row 2's stacked cards (see
+// BattleArea.css) — read by the same effect to compute its exact natural height
+// arithmetically, rather than by measuring already-rendered elements whose own size
+// is what's in question (see that effect's comment for why).
+const BATTLE_SLOT_GAP = 12 // .active-column/.battle-column-history's gap, between the two stacked cards
+const HISTORY_PANEL_PADDING_TOP = 8
+const HISTORY_PANEL_PADDING_BOTTOM = 24 // extra bottom padding for the history scrollbar's gutter
+const BOTTOM_BAR_PADDING = 16 // .bottom-bar's padding-bottom, extra clearance below the player's hand
 
 // Backlog/technical debt deltas are normally additive, but any contributing card can
 // instead carry '*' to wipe the stat to 0 outright (e.g. a reorg clearing the
@@ -207,17 +223,42 @@ function GameBoard() {
   // first flight's source/dest rects being measured mid-layout-shift, which reads as
   // that card skipping its flight and just appearing already in the hand/manager row.
   const [pageLoaded, setPageLoaded] = useState(() => document.readyState === 'complete')
-  // Measured width of the manager's deck + hand (see the ResizeObserver effect below)
-  // — applied to .top-bar-manager directly, since CSS shrink-to-fit doesn't reliably
-  // see through the nested flex layers between .top-bar-manager and the actual hand
-  // cards to compute this on its own.
-  const [managerHandAreaWidth, setManagerHandAreaWidth] = useState<number | null>(null)
-  // Measured width of the Slack panel (see the ResizeObserver effect below) — applied
-  // to .hud so the meters panel matches its width instead of sizing off its own
-  // unrelated 420px flex-basis.
-  const [slackPanelWidth, setSlackPanelWidth] = useState<number | null>(null)
-  const slackPanelRef = useRef<HTMLDivElement>(null)
-
+  // Measured width of the wider of the manager's and player's deck+hand rows (see the
+  // ResizeObserver effect below) — applied to .game-board's grid-template-columns so
+  // the board's first column (manager hand / history / player hand) is exactly wide
+  // enough for them. Can't leave this column's width as plain `auto` and let CSS Grid
+  // figure it out: this column's cells size themselves via aspect-ratio from their
+  // row's height, and that row is an `fr` track — Chromium resolves that combination
+  // by treating the row height as effectively unbounded during the column's intrinsic
+  // sizing pass, giving a wildly inflated column width (confirmed directly in
+  // devtools). Measuring the actual rendered width here sidesteps that circular
+  // row-height/column-width dependency entirely.
+  const [column1Width, setColumn1Width] = useState<number | null>(null)
+  // Explicit pixel heights for column 1's three rows (manager hand / history / player
+  // hand — see GameBoard.css), set by the same effect as column1Width. Can't leave
+  // these as CSS `fr`/`auto` tracks: row 1's only other occupant is .hud (no fixed
+  // card-shaped size of its own) while row 3's is .discard-column (which does have
+  // one), so the two rows' intrinsic-sizing inputs aren't actually symmetric even
+  // though both are meant to fit one card — confirmed directly in devtools as the
+  // manager and player rows resolving to visibly different heights under `1fr 2fr
+  // 1fr`. Computing each row's height arithmetically from a single shared card-size
+  // formula (rather than measuring whatever CSS happened to resolve) guarantees the
+  // manager and player cards themselves always match — row 3 is taller only because
+  // .bottom-bar adds its own padding-bottom below the (same-size) player card, for
+  // clearance from the bottom of the screen (see BOTTOM_BAR_PADDING).
+  const [rowHeights, setRowHeights] = useState<[number, number, number] | null>(null)
+  // Multiplies every card/deck's vw-based size formula (see Hand.css, ManagerHand.css,
+  // Deck.css) down from 1 when column1Width/rowHeights above would otherwise overflow
+  // the viewport — those formulas only know the viewport's raw width, not what else
+  // that width/height needs to share with (the meters/Slack column, on a viewport too
+  // narrow for both — an iPad in landscape, in particular — or the vertical space
+  // .game-board actually has), so something has to give; this shrinks the cards
+  // themselves rather than letting them spill out of column 1 or off the screen. Read
+  // synchronously via cardScaleRef (below) inside the same ResizeObserver callback
+  // that sets it, so each recompute measures against the true scale: 1 size rather
+  // than compounding on the previous frame's already-shrunk one.
+  const [cardScale, setCardScale] = useState(1)
+  const cardScaleRef = useRef(1)
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
   const slackMessageCounter = useRef(0)
@@ -269,6 +310,7 @@ function GameBoard() {
   const playerDeckRef = useRef<HTMLDivElement>(null)
   const managerDeckRef = useRef<HTMLDivElement>(null)
   const handRef = useRef<HTMLDivElement>(null)
+  const gameBoardRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
@@ -567,35 +609,79 @@ function GameBoard() {
     return () => window.removeEventListener('load', handleLoad)
   }, [pageLoaded])
 
-  // .deck-wrap and .manager-hand-wrap both size themselves to their own content (see
-  // GameBoard.css/ManagerHand.css) regardless of what .top-bar-manager does, so their
-  // combined rendered width is the true "just enough for the deck + hand" measurement
-  // — .top-bar-manager can't compute that itself (see the flex-basis:auto note above).
+  // See column1Width/rowHeights/cardScale above — measures both sides' deck + hand
+  // width and takes the wider one, so the board's first column fits either row
+  // without waiting on CSS Grid to do it (which is exactly what's unreliable here).
+  // Also caps that width — and shrinks the cards via cardScale to match — against
+  // whatever space is actually left once column 2 (the dropzone) and column 3's floor
+  // width (matching .game-board's minmax(200px, 1fr), see GameBoard.css) are
+  // reserved. Row heights are computed the same way, but arithmetically rather than
+  // by measuring the rows themselves (see rowHeights' comment for why): one shared,
+  // scaled card-height value, identical to Hand.css's .hand-slot, drives all four
+  // "card rows" (manager hand, the two stacked history/active cards, player hand),
+  // plus each row's own fixed (unscaled) gap/padding chrome — see rowChromeHeight.
   useLayoutEffect(() => {
-    const deckEl = managerDeckRef.current
-    const handEl = managerHandRef.current
-    if (!deckEl || !handEl) return
+    const boardEl = gameBoardRef.current
+    const els = [managerDeckRef.current, managerHandRef.current, playerDeckRef.current, handRef.current]
+    if (!boardEl || els.some((el) => !el)) return
+    const [managerDeckEl, managerHandEl, playerDeckEl, playerHandEl] = els as HTMLElement[]
     const recompute = () => {
-      // 20px matches .side-row's own gap between the deck and the hand.
-      setManagerHandAreaWidth(deckEl.getBoundingClientRect().width + 20 + handEl.getBoundingClientRect().width)
+      // The measured elements are already shrunk by whatever scale was applied last
+      // time, so divide it back out to get the true, scale: 1 natural size — without
+      // this, each pass would compute a new scale relative to an already-shrunk
+      // measurement instead of the real one.
+      const scale = cardScaleRef.current || 1
+      const managerWidth =
+        (managerDeckEl.getBoundingClientRect().width + 20 + managerHandEl.getBoundingClientRect().width) / scale
+      const playerWidth =
+        (playerDeckEl.getBoundingClientRect().width + 20 + playerHandEl.getBoundingClientRect().width) / scale
+      const naturalWidth = Math.max(managerWidth, playerWidth)
+
+      const column2El = boardEl.querySelector<HTMLElement>('.active-column')
+      const column2Width = column2El?.getBoundingClientRect().width ?? 0
+      const reservedWidth = column2Width + COLUMN3_MIN_WIDTH + BOARD_COLUMN_GAP * 2 + BOARD_PADDING * 2
+      const availableWidth = Math.max(0, boardEl.getBoundingClientRect().width - reservedWidth)
+      const widthScale = naturalWidth > 0 ? Math.min(1, availableWidth / naturalWidth) : 1
+
+      // Same 12vw * 7/5 formula as Hand.css's .hand-slot, computed directly from the
+      // viewport rather than measured off a rendered card — this is the "one card"
+      // unit that every row height below is built from. Four of these stack up across
+      // the three rows (row 1 is one, row 2 is two, row 3 is one).
+      const naturalCardHeight = window.innerWidth * 0.12 * (7 / 5)
+      const CARD_UNITS = 4
+      // Every one of these is a literal, unscaled CSS px value (none of them are
+      // written with var(--card-scale) — see BattleArea.css/GameBoard.css), so unlike
+      // the card height itself, none of it shrinks when cardScale does. Scaling it
+      // down here anyway (as an earlier version of this effect did) under-allocates
+      // row 2/row 3's actual height on any viewport where cardScale < 1, clipping the
+      // manager's card off the top of the (bottom-anchored) history area.
+      const rowChromeHeight =
+        BOARD_ROW_GAP * 2 + BOTTOM_BAR_PADDING + BATTLE_SLOT_GAP + HISTORY_PANEL_PADDING_TOP + HISTORY_PANEL_PADDING_BOTTOM
+      // document.documentElement, not boardEl: .game-board has no explicit height of
+      // its own (it hugs whatever these rows resolve to), so measuring it here would
+      // just measure the answer we're trying to compute. #root fills the viewport
+      // (100svh, see index.css) with nothing else in it, so the viewport height is
+      // the board's actual vertical budget.
+      const availableHeight = Math.max(0, document.documentElement.clientHeight - BOARD_PADDING * 2)
+      const availableForCards = Math.max(0, availableHeight - rowChromeHeight)
+      const heightScale =
+        naturalCardHeight > 0 ? Math.min(1, availableForCards / (naturalCardHeight * CARD_UNITS)) : 1
+
+      const nextScale = Math.min(widthScale, heightScale)
+      const cardHeight = naturalCardHeight * nextScale
+      cardScaleRef.current = nextScale
+      setCardScale(nextScale)
+      setColumn1Width(Math.min(naturalWidth * nextScale, availableWidth))
+      setRowHeights([
+        cardHeight,
+        cardHeight * 2 + BATTLE_SLOT_GAP + HISTORY_PANEL_PADDING_TOP + HISTORY_PANEL_PADDING_BOTTOM,
+        cardHeight + BOTTOM_BAR_PADDING,
+      ])
     }
     recompute()
     const observer = new ResizeObserver(recompute)
-    observer.observe(deckEl)
-    observer.observe(handEl)
-    return () => observer.disconnect()
-  }, [])
-
-  // Keeps .hud's width matched to the Slack panel's rendered width (see SlackPanel's
-  // forwarded ref) — the two live in separate flex contexts (.top-bar vs .battle-row),
-  // so there's no CSS-only way to size one off the other.
-  useLayoutEffect(() => {
-    const panelEl = slackPanelRef.current
-    if (!panelEl) return
-    const recompute = () => setSlackPanelWidth(panelEl.getBoundingClientRect().width)
-    recompute()
-    const observer = new ResizeObserver(recompute)
-    observer.observe(panelEl)
+    els.forEach((el) => observer.observe(el!))
+    observer.observe(boardEl)
     return () => observer.disconnect()
   }, [])
 
@@ -643,7 +729,7 @@ function GameBoard() {
     const slotIndex = hand.findIndex((c) => c?.id === cardId)
     if (slotIndex === -1) return
     const card = hand[slotIndex]!
-    const discardEl = handRef.current?.querySelector<HTMLElement>('.discard-zone')
+    const discardEl = document.querySelector<HTMLElement>('.discard-zone')
     const rect = discardEl?.getBoundingClientRect()
 
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
@@ -1375,69 +1461,69 @@ function GameBoard() {
   )
 
   return (
-    <div className={`game-board${draggingCard ? ' game-board-dragging' : ''}`}>
+    <div
+      ref={gameBoardRef}
+      className={`game-board${draggingCard ? ' game-board-dragging' : ''}`}
+      style={
+        {
+          ...(column1Width != null && {
+            gridTemplateColumns: `${column1Width}px auto minmax(${COLUMN3_MIN_WIDTH}px, 1fr)`,
+          }),
+          ...(rowHeights != null && {
+            gridTemplateRows: `${rowHeights[0]}px ${rowHeights[1]}px ${rowHeights[2]}px`,
+          }),
+          '--card-scale': cardScale,
+        } as CSSProperties
+      }
+    >
       {!gameStarted && <SplashScreen onStart={() => setGameStarted(true)} />}
       {gameOver && <GameOverScreen result={gameOver} onRestart={startNewGame} />}
 
-      <div className="top-bar">
-        <div
-          className="top-bar-manager"
-          style={managerHandAreaWidth != null ? { width: managerHandAreaWidth } : undefined}
-        >
-          <p className="side-label">Your manager</p>
-          <div className="side-row">
-            <div className="deck-wrap" ref={managerDeckRef}>
-              <Deck image="/cards/pc-manager-back-image.webp" count={30} />
-            </div>
-            <div className="manager-hand-wrap" ref={managerHandRef}>
-              <ManagerHand ids={MANAGER_SLOT_IDS} usedIds={usedManagerIds} hiddenId={hiddenHandId} />
-            </div>
+      <div className="top-bar-manager">
+        <div className="side-row">
+          <div className="deck-wrap" ref={managerDeckRef}>
+            <Deck image="/cards/pc-manager-back-image.webp" count={30} />
           </div>
-        </div>
-
-        <div
-          className="hud"
-          style={slackPanelWidth != null ? { flex: `0 0 ${slackPanelWidth}px`, minWidth: 0 } : undefined}
-        >
-          <div className="hud-panel">
-            <Meters
-              backlog={backlog}
-              techDebt={techDebt}
-              burnout={burnout}
-              vesting={vesting}
-              backlogFlashKey={backlogFlashKey}
-              techDebtFlashKey={techDebtFlashKey}
-              burnoutFlashKey={burnoutFlashKey}
-              vestingFlashKey={vestingFlashKey}
-              backlogMaxed={backlogMaxed}
-              techDebtMaxed={techDebtMaxed}
-              burnoutMaxed={burnoutMaxed}
-              vestingMaxed={vestingMaxed}
-            />
+          <div className="manager-hand-wrap" ref={managerHandRef}>
+            <ManagerHand ids={MANAGER_SLOT_IDS} usedIds={usedManagerIds} hiddenId={hiddenHandId} />
           </div>
         </div>
       </div>
 
-      <div className="battle-row">
-        <BattleArea
-          ref={activeSlotRef}
-          history={history}
-          activePlayerCard={activePlayerCard}
-          activeManagerCard={activeManagerCard}
-          historyWidth={managerHandAreaWidth}
-          lockMessage={lockMessage}
-        />
-        <SlackPanel
-          ref={slackPanelRef}
-          channels={CHANNEL_ORDER}
-          activeChannel={activeSlackChannel}
-          onSelectChannel={setActiveSlackChannel}
-          messages={slackMessages}
-        />
+      <div className="hud">
+        <div className="hud-panel">
+          <Meters
+            backlog={backlog}
+            techDebt={techDebt}
+            burnout={burnout}
+            vesting={vesting}
+            backlogFlashKey={backlogFlashKey}
+            techDebtFlashKey={techDebtFlashKey}
+            burnoutFlashKey={burnoutFlashKey}
+            vestingFlashKey={vestingFlashKey}
+            backlogMaxed={backlogMaxed}
+            techDebtMaxed={techDebtMaxed}
+            burnoutMaxed={burnoutMaxed}
+            vestingMaxed={vestingMaxed}
+          />
+        </div>
       </div>
+
+      <BattleArea
+        ref={activeSlotRef}
+        history={history}
+        activePlayerCard={activePlayerCard}
+        activeManagerCard={activeManagerCard}
+        lockMessage={lockMessage}
+      />
+      <SlackPanel
+        channels={CHANNEL_ORDER}
+        activeChannel={activeSlackChannel}
+        onSelectChannel={setActiveSlackChannel}
+        messages={slackMessages}
+      />
 
       <div className="bottom-bar">
-        <p className="side-label">You</p>
         <div className="side-row">
           <div className="deck-wrap" ref={playerDeckRef}>
             <Deck image="/cards/pc-player-back-image.webp" count={34} />

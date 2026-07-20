@@ -15,35 +15,86 @@ export type SoundName =
   | 'gm-action-meter-up'
   | 'gm-action-meter-full'
 
-// A fresh Audio() per call (rather than one reused instance) so the same sound can
-// overlap or retrigger — e.g. two draws landing close together — without cutting
-// itself off.
-export function playSound(name: SoundName) {
-  const audio = new Audio(`/sounds/${name}.mp3`)
-  audio.play().catch(() => {
-    // Autoplay can be blocked before the player's first interaction, and the file
-    // may not exist yet during development — either way, missing sound shouldn't
-    // break the game.
-  })
+// iOS Safari only lets a freshly-created <audio>/AudioContext start playback when
+// that call happens synchronously inside a user-gesture handler. Most of this game's
+// sounds fire from setTimeout chains (timed to card-flip animations), which is no
+// longer "inside" the gesture by the time they run — so playback gets silently
+// blocked after the first sound or two. The Web Audio API sidesteps this: unlock one
+// shared AudioContext synchronously on the very first touch/click, and every
+// subsequent start() call succeeds regardless of what triggered it, because the
+// unlock lives on the context rather than on each individual play call.
+let audioContext: AudioContext | null = null
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  if (!audioContext) {
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return null
+    audioContext = new Ctor()
+  }
+  return audioContext
 }
 
-const durationCache = new Map<SoundName, Promise<number | null>>()
+function unlockAudioContext() {
+  const ctx = getAudioContext()
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {})
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['pointerdown', 'touchend', 'keydown'] as const
+  for (const eventName of unlockEvents) {
+    window.addEventListener(eventName, unlockAudioContext, { passive: true })
+  }
+}
+
+const bufferCache = new Map<SoundName, Promise<AudioBuffer | null>>()
+
+function getSoundBuffer(name: SoundName): Promise<AudioBuffer | null> {
+  let cached = bufferCache.get(name)
+  if (!cached) {
+    cached = (async () => {
+      const ctx = getAudioContext()
+      if (!ctx) return null
+      try {
+        const response = await fetch(`/sounds/${name}.mp3`)
+        if (!response.ok) return null
+        const arrayBuffer = await response.arrayBuffer()
+        return await ctx.decodeAudioData(arrayBuffer)
+      } catch {
+        // File may not exist yet during development, or decoding may be
+        // unsupported — either way, missing sound shouldn't break the game.
+        return null
+      }
+    })()
+    bufferCache.set(name, cached)
+  }
+  return cached
+}
+
+// Fires a sound. Safe to call repeatedly in quick succession — each call gets its
+// own AudioBufferSourceNode, so overlapping sounds (e.g. two draws landing close
+// together) don't cut each other off.
+export function playSound(name: SoundName) {
+  const ctx = getAudioContext()
+  if (!ctx) return
+  unlockAudioContext()
+  getSoundBuffer(name).then((buffer) => {
+    if (!buffer) return
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    source.start(0)
+  })
+}
 
 // Resolves a sound file's actual playback length in milliseconds, so a caller can
 // time an animation to match it instead of the two drifting independently (e.g. a
 // card-draw flight finishing well before, or after, its whoosh sound). Cached per
-// name — only ever loads each file's metadata once. Resolves null if the duration
-// can't be determined (file missing, blocked, etc.), so callers should fall back to
-// a fixed default in that case.
+// name via getSoundBuffer — only ever loads each file's data once. Resolves null if
+// the duration can't be determined (file missing, blocked, etc.), so callers should
+// fall back to a fixed default in that case.
 export function getSoundDurationMs(name: SoundName): Promise<number | null> {
-  let cached = durationCache.get(name)
-  if (!cached) {
-    cached = new Promise((resolve) => {
-      const audio = new Audio(`/sounds/${name}.mp3`)
-      audio.addEventListener('loadedmetadata', () => resolve(audio.duration * 1000), { once: true })
-      audio.addEventListener('error', () => resolve(null), { once: true })
-    })
-    durationCache.set(name, cached)
-  }
-  return cached
+  return getSoundBuffer(name).then((buffer) => (buffer ? buffer.duration * 1000 : null))
 }
