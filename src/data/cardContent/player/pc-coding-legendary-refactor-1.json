@@ -1,0 +1,8 @@
+{
+  "title": "Legendary Refactor",
+  "category": "coding",
+  "type" : "Reset",
+  "description": "For some unknown reason you spend a week actually giving a shit and you clear all tech debt.",
+  "action" : "reset",
+  "target" : "techDebt"
+}

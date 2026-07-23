@@ -128,12 +128,12 @@
    GameBoard.tsx's HAND_CARD_BREAKPOINTS) — the same 12vw-based formula as a single
    card's width in Hand.css's .hand-slot (aspect-ratio 5/7 of that formula's height
    works out to plain `12vw`), times the card count, plus the gaps between them and
-   this row's own left/right padding. .manager-hand itself (see ManagerHand.css) is
-   never narrower than this — it always holds all 5 slots at full size — so below 5
-   visible cards it's wider than this box and overflow-x carries the rest off to the
-   side, reachable by scrolling, instead of every slot getting squeezed to fit.
-   overflow-y: hidden so a vertical scrollbar can never also appear alongside the
-   horizontal one on a viewport too short for even one card row. */
+   this row's own left/right padding. GameBoard.tsx keeps the actual number of
+   manager-hand slots it renders in sync with --visible-hand-cards (returning any
+   cards in a removed slot to the top of the manager's draw pile, and dealing fresh
+   ones into newly available slots), so .manager-hand's own content width never
+   exceeds this box — overflow is hidden rather than scrollable since it should
+   never actually trigger. */
 .manager-hand-wrap {
   flex: 0 0 auto;
   height: 100%;
@@ -141,8 +141,7 @@
   width: calc(
     var(--visible-hand-cards, 5) * (var(--card-scale, 1) * 12vw) + (var(--visible-hand-cards, 5) - 1) * 12px + 16px
   );
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 /* Same passthrough purpose and same width/overflow treatment as .manager-hand-wrap
@@ -158,38 +157,7 @@
   width: calc(
     var(--visible-hand-cards, 5) * (var(--card-scale, 1) * 12vw) + (var(--visible-hand-cards, 5) - 1) * 12px + 16px
   );
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-/* Thin, themed scrollbar for the two hand rows above — same purple accent as
-   .history-scrollbar-thumb (see BattleArea.css) rather than the browser default,
-   and sized to HAND_SCROLLBAR_GUTTER (see GameBoard.tsx) so it lands in the extra
-   height already reserved below the cards instead of shrinking them. Firefox has no
-   equivalent of the exact-px ::-webkit-scrollbar sizing below — scrollbar-width:
-   thin is the closest approximation available there, close enough not to visibly
-   misalign the row. */
-.manager-hand-wrap,
-.hand-wrap {
-  scrollbar-width: thin;
-  scrollbar-color: #aa3bff rgba(255, 255, 255, 0.1);
-}
-
-.manager-hand-wrap::-webkit-scrollbar,
-.hand-wrap::-webkit-scrollbar {
-  height: 10px;
-}
-
-.manager-hand-wrap::-webkit-scrollbar-track,
-.hand-wrap::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-}
-
-.manager-hand-wrap::-webkit-scrollbar-thumb,
-.hand-wrap::-webkit-scrollbar-thumb {
-  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
-  border-radius: 999px;
+  overflow: hidden;
 }
 
 /* Passthrough wrapper around a Deck (holds the ref used as the flight animation's

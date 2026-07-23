@@ -125,6 +125,36 @@
   transform: rotate(-8deg);
 }
 
+/* Same idea as .game-card-stopped-overlay, but for a character card (or a recurring
+   card attributed to that character) taken down by an 'eliminate' + target:'character'
+   card — a red-tinted stripe (matching .game-card-eliminate-badge's warning color)
+   distinguishes "this character is gone" from the neutral grey stopped/cancelled use. */
+.game-card-eliminated-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(80, 10, 10, 0.5),
+    rgba(80, 10, 10, 0.5) 10px,
+    rgba(179, 57, 57, 0.4) 10px,
+    rgba(179, 57, 57, 0.4) 20px
+  );
+}
+
+.game-card-eliminated-label {
+  font-size: 13cqw;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.9);
+  transform: rotate(-8deg);
+}
+
 /* Same idea as .game-card-stopped-overlay, but for a card neutralized the same round
    by a player's 'cancel' card rather than a later-round eliminate — see GameBoard.tsx. */
 .game-card-cancelled-overlay {
@@ -236,27 +266,44 @@
 
 /* Eliminate-action cards get a dark maroon face instead of the default charcoal —
    close enough to the default dark-card look that the base white/off-white text
-   colors still work unchanged, but tinted red to read as a warning. The bright red
-   badge (see .game-card-eliminate-badge) stays the one loud accent instead of
-   competing with a red face. */
+   colors still work unchanged, but tinted red to read as a warning. The silver
+   badge (see .game-card-eliminate-badge) stays the one high-contrast accent instead
+   of competing with a red face. */
 .game-card-template-eliminate {
   background: linear-gradient(160deg, #3a0a0a, #160404);
 }
 
-/* Flat, saturated red (not the softer burnout gradient) so this reads as a distinct
-   warning rather than just another stat pill — deliberately the highest-contrast badge
-   on the card. */
-.game-card-eliminate-badge {
+/* A targeted reset (action: 'reset' + `target` naming a single stat) gets the same
+   silver used for the eliminate/cancel badges instead of the gold plain-reset badge
+   below — silver reads as a neutral, precise counter (one specific stat) rather than
+   the broader "clear everything" gold badge. */
+.game-card-reset-target-badge {
   flex-shrink: 0;
   padding: 2.67cqw 4cqw;
   border-radius: 999px;
-  background: #b33939;
-  color: #fff;
+  background: linear-gradient(90deg, #f2f3f5, #b7bcc4);
+  color: #23242c;
   font-size: 5.33cqw;
   font-weight: 800;
   text-align: center;
   letter-spacing: 0.27cqw;
-  box-shadow: 0 0 10px rgba(179, 57, 57, 0.8);
+  box-shadow: 0 0 10px rgba(183, 188, 196, 0.6);
+}
+
+/* Same silver used for the cancel badge, with black text — reads as a distinct
+   high-contrast accent against the card's red face without the harsher, more
+   alarming look a flat red badge would have. */
+.game-card-eliminate-badge {
+  flex-shrink: 0;
+  padding: 2.67cqw 4cqw;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2f3f5, #b7bcc4);
+  color: #000;
+  font-size: 5.33cqw;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.27cqw;
+  box-shadow: 0 0 10px rgba(183, 188, 196, 0.6);
 }
 
 /* Same gold used for vesting stat pills elsewhere on the card, so "reset" reads as a

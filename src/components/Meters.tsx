@@ -108,7 +108,7 @@ function Meters({
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Vesting</span>
-            <span className="meter-bar-value meter-bar-value-vesting">{vestingPct}%</span>
+            <span className="meter-bar-value meter-bar-value-vesting">{vesting}</span>
           </div>
           <div className="meter-bar-track">
             <div

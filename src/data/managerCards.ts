@@ -14,6 +14,8 @@ export const sampleManagerCards: ManagerCard[] = Object.entries(modules).flatMap
     id: i === 0 ? id : `${id}#${i + 1}`,
     side: 'manager' as const,
     ...data,
+    // Purely cosmetic — falls back to the card's own action when the JSON omits it.
+    type: data.type ?? data.action,
     // The JSON file and its art share a filename, so the image never needs its own field.
     image: `/cards/manager/${id}.webp`,
   }))

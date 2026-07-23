@@ -1,0 +1,10 @@
+{
+  "title": "Happy Hour",
+  "category": "meeting",
+  "type" : "recurring",
+  "character" : "cmo",
+  "description": "Your boss hires his slob nephew, who has no skills apart from spilling food on his shirt.",
+  "action" : "blurred vision",
+  "duration" : 2
+
+}

@@ -62,7 +62,13 @@ interface ManagerDrawFlight {
   durationMs: number
 }
 
-const MANAGER_SLOT_IDS = Array.from({ length: 5 }, (_, i) => `m${i}`)
+// Max number of slots either hand can ever have — how many the opening deal fills
+// at its widest, and how many ids MANAGER_SLOT_IDS below provides. The resize-sync
+// effect in GameBoard shrinks/grows each hand's actual rendered slot count to
+// match visibleHandCards (see HAND_CARD_BREAKPOINTS below, which tops out here
+// too), so this is a ceiling rather than a fixed size.
+const HAND_SIZE = 5
+const MANAGER_SLOT_IDS = Array.from({ length: HAND_SIZE }, (_, i) => `m${i}`)
 // Matches .card-flight's CSS transition duration — used until mc-action-draw-card's
 // actual length loads (see the ref below), and again if it never does.
 const MANAGER_DRAW_DEFAULT_DURATION_MS = 450
@@ -84,7 +90,10 @@ const METER_STEP_DELAY_MS = 550
 // gm-action-meter-full's actual length loads (see the ref below), and again if it
 // never does.
 const METER_FULL_DEFAULT_DURATION_MS = 900
-const HAND_SIZE = 5
+// Same idea as METER_FULL_DEFAULT_DURATION_MS, but for gm-action-vesting-full's length
+// — used to time the win sequence's own hold (see runWinSequence) until that sound's
+// actual duration loads.
+const VESTING_FULL_DEFAULT_DURATION_MS = 900
 const STARTING_BURNOUT = 0
 const STAT_MAX = 500
 const BURNOUT_MAX = 1000
@@ -161,13 +170,19 @@ interface RecurringEffect {
   roundId: string
   side: 'player' | 'manager'
   category: string
+  // Which character (if any) this recurring card is attributed to — an 'eliminate' +
+  // target:'character' card takes down every not-yet-stopped recurring effect that
+  // matches the character it eliminates, alongside that character's own card (see
+  // findEliminatedCharacterRoundIds).
+  character?: string
   backlog?: number | '*'
   techDebt?: number | '*'
   burnout?: number
   vesting?: number
-  // Set once an 'eliminate' card of the same type stops it — a stopped effect stays
-  // in the list (so the battle history can still point at the round it came from,
-  // for the STOPPED overlay) but is excluded from every future delta calculation.
+  // Set once an 'eliminate' card of the same type (or an eliminated character it's
+  // attributed to) stops it — a stopped effect stays in the list (so the battle
+  // history can still point at the round it came from, for the STOPPED/ELIMINATED
+  // overlay) but is excluded from every future delta calculation.
   stopped: boolean
   // Turns left that a 'block recurring' effect has suspended this effect for — set
   // (and reset) whenever a matching block card is played against it, ticked down by
@@ -178,7 +193,7 @@ interface RecurringEffect {
   suspendedTurnsRemaining?: number
   // roundId of the card whose 'block recurring' effect suspended this — lets an
   // 'eliminate' + target:'character' card find and lift exactly the suspensions that
-  // character caused (see findStoppedRoundId) without touching unrelated blocks.
+  // character caused (see findEliminatedCharacterRoundIds) without touching unrelated blocks.
   suspendedBy?: string
 }
 
@@ -191,14 +206,22 @@ function GameBoard() {
   const playerCardOrder = useRef(shuffle(sampleHand)).current
   // Both hands start empty — the opening-deal effect below animates all twelve cards
   // (six manager, six player) into their slots once the splash screen is dismissed.
-  const [hand, setHand] = useState<(PlayerCard | null)[]>(() => Array(HAND_SIZE).fill(null))
+  // Sized to however many slots are visible at the starting viewport width (see
+  // visibleHandCards below) rather than the max HAND_SIZE, so a narrow starting
+  // window doesn't deal cards into slots that immediately get removed again by the
+  // resize-sync effect further down.
+  const [hand, setHand] = useState<(PlayerCard | null)[]>(() =>
+    Array(visibleHandCardsForWidth(window.innerWidth)).fill(null),
+  )
   // Tracks the actual card sitting in each manager slot (index-matched to
   // MANAGER_SLOT_IDS) so the round-start effect can pick the most damaging card in
   // hand to play, rather than always drawing from the same slot.
   const [managerHand, setManagerHand] = useState<(ManagerCard | null)[]>(() =>
-    Array(MANAGER_SLOT_IDS.length).fill(null),
+    Array(visibleHandCardsForWidth(window.innerWidth)).fill(null),
   )
-  const [usedManagerIds, setUsedManagerIds] = useState<Set<string>>(() => new Set(MANAGER_SLOT_IDS))
+  const [usedManagerIds, setUsedManagerIds] = useState<Set<string>>(
+    () => new Set(MANAGER_SLOT_IDS.slice(0, visibleHandCardsForWidth(window.innerWidth))),
+  )
   // Flips true once the opening deal finishes, gating the manager's first round-start
   // play so it can't fly a card out of a hand slot that hasn't been dealt into yet.
   const [dealt, setDealt] = useState(false)
@@ -289,10 +312,48 @@ function GameBoard() {
   // than compounding on the previous frame's already-shrunk one.
   const [cardScale, setCardScale] = useState(1)
   const cardScaleRef = useRef(1)
-  // How many cards each hand shows before the rest scroll off (see
-  // HAND_CARD_BREAKPOINTS) — lazily initialized from the real viewport width so the
-  // very first paint already picks the right tier instead of flashing 5-wide first.
+  // How many slots each hand actually renders (see the resize-sync effect below,
+  // which keeps hand/managerHand's own length equal to this) — lazily initialized
+  // from the real viewport width so the very first paint already picks the right
+  // tier instead of flashing 5-wide first.
   const [visibleHandCards, setVisibleHandCards] = useState(() => visibleHandCardsForWidth(window.innerWidth))
+  // Last value visibleHandCards actually resolved to — read by the resize-sync
+  // effect below to tell whether a change grew or shrank the hands, since the
+  // effect's own prior render isn't otherwise available inside it.
+  const prevVisibleHandCardsRef = useRef(visibleHandCards)
+  // Slot indices/manager-slot-ids queued by the resize-sync effect below when a
+  // resize grows a hand, waiting for the newly added (still-empty) slots to exist
+  // in the DOM before startPlayerDraw/startManagerDraw can fly cards into them —
+  // drained by the effect just after it, once that's true.
+  const pendingPlayerDealsRef = useRef<number[]>([])
+  const pendingManagerDealsRef = useRef<string[]>([])
+  // Live mirrors of hand/managerHand (kept current by the sync effects below) —
+  // read by the opening-deal effect further down to see which slots are actually
+  // still empty at an arbitrary later point in time (its own callbacks fire well
+  // after the render that changed hand/managerHand, so closing over those directly
+  // would see a stale snapshot from whenever the effect itself first ran).
+  const handContentRef = useRef<(PlayerCard | null)[]>([])
+  const managerHandContentRef = useRef<(ManagerCard | null)[]>([])
+  // True while runManagerDealQueue/runPlayerDealQueue (below) has an active chain
+  // of draws running for that side — guards against two calls to the same queue
+  // runner overlapping, which would stomp each other's shared draw timers (see
+  // startPlayerDraw/startManagerDraw, which both reset their timer bucket on every
+  // call). A second call while one's already running is a safe no-op: the running
+  // chain re-reads its pending queue on every step, so anything pushed onto it
+  // meanwhile still gets picked up.
+  const managerDealerActive = useRef(false)
+  const playerDealerActive = useRef(false)
+  // Flipped true by the opening-deal effect once it's actually entered its manager
+  // phase / player phase (see enqueueMissingManagerDeals/enqueueMissingPlayerDeals
+  // there) — read by maybeCompleteInitialDeal below to tell "everything's drained
+  // because the opening deal genuinely finished" apart from "everything's drained
+  // because nothing had been queued yet".
+  const initialManagerPhaseStartedRef = useRef(false)
+  const initialPlayerPhaseStartedRef = useRef(false)
+  // Set once maybeCompleteInitialDeal below has actually called setDealt(true) —
+  // makes every later call a no-op instead of a harmless-but-pointless extra
+  // setDealt(true) every time a post-deal resize's queue idles back out.
+  const initialDealCompletedRef = useRef(false)
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
   const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
   const slackMessageCounter = useRef(0)
@@ -320,6 +381,9 @@ function GameBoard() {
   // Same idea again, for gm-action-meter-full's length — timing the gap between each
   // maxed meter's turn in runLossSequence's glow cascade.
   const meterFullDurationRef = useRef(METER_FULL_DEFAULT_DURATION_MS)
+  // Same idea again, for gm-action-vesting-full's length — timing runWinSequence's own
+  // hold before the game-over splash fades in.
+  const vestingFullDurationRef = useRef(VESTING_FULL_DEFAULT_DURATION_MS)
   // Live mirrors of backlog/techDebt/burnout/vesting, kept current by the sync effects
   // below — read from the round-resolve cascade's own completion point, which runs
   // inside a chain of setTimeouts from an older render's closure, so the plain
@@ -377,7 +441,7 @@ function GameBoard() {
   // an 'eliminate' + target:'character' card un-reveals the most recent entry, while
   // an 'eliminate' + target:'character:{name}' card un-reveals the entry matching
   // that name specifically (wherever in the list it is), re-locking any 'coding' card
-  // naming it and lifting whatever it suspended (see findStoppedRoundId). An entry is
+  // naming it and lifting whatever it suspended (see findEliminatedCharacterRoundIds). An entry is
   // removed once eliminated, so it can't be targeted again until that character is
   // replayed.
   const characterPlays = useRef<{
@@ -525,6 +589,86 @@ function GameBoard() {
     )
   }
 
+  // Drains pendingManagerDealsRef one card at a time — never two at once, since
+  // startManagerDraw resets managerDrawTimers on every call, so overlapping calls
+  // would cancel everything but the last one's animation. Safe to call any time:
+  // a no-op if a chain's already running (managerDealerActive), and if the queue is
+  // empty right now it just calls onIdle immediately. Re-reads the queue itself on
+  // every step rather than snapshotting it up front, so anything pushed onto it
+  // after this starts — by a resize mid-chain, in particular — still gets picked up
+  // by this same chain instead of needing a second one.
+  const runManagerDealQueue = (onIdle?: () => void) => {
+    if (managerDealerActive.current) return
+    managerDealerActive.current = true
+    const step = () => {
+      const id = pendingManagerDealsRef.current.shift()
+      if (id === undefined) {
+        managerDealerActive.current = false
+        onIdle?.()
+        return
+      }
+      startManagerDraw(id, step)
+    }
+    step()
+  }
+
+  // Same idea as runManagerDealQueue above, for pendingPlayerDealsRef.
+  const runPlayerDealQueue = (onIdle?: () => void) => {
+    if (playerDealerActive.current) return
+    playerDealerActive.current = true
+    const step = () => {
+      const index = pendingPlayerDealsRef.current.shift()
+      if (index === undefined) {
+        playerDealerActive.current = false
+        onIdle?.()
+        return
+      }
+      startPlayerDraw(index, step)
+    }
+    step()
+  }
+
+  // Queues every manager slot that's actually still empty right now (read from
+  // managerHandContentRef, not a snapshot — see its comment) — used by the opening
+  // deal, which needs an accurate picture of what's left to deal at the moment each
+  // of its two phases actually starts, not just what was empty when the effect
+  // first ran.
+  const enqueueMissingManagerDeals = () => {
+    managerHandContentRef.current.forEach((c, i) => {
+      if (c === null) pendingManagerDealsRef.current.push(MANAGER_SLOT_IDS[i])
+    })
+  }
+
+  // Same idea as enqueueMissingManagerDeals above, for the player's hand.
+  const enqueueMissingPlayerDeals = () => {
+    handContentRef.current.forEach((c, i) => {
+      if (c === null) pendingPlayerDealsRef.current.push(i)
+    })
+  }
+
+  // Flips dealt true once the opening deal has genuinely finished — passed as the
+  // onIdle callback to every runManagerDealQueue/runPlayerDealQueue call (both the
+  // opening-deal effect's own and the resize-sync one's growth top-ups below)
+  // rather than trusting whichever specific call happens to be the one that
+  // actually starts a given chain: runManagerDealQueue/runPlayerDealQueue only
+  // invoke the onIdle *they* were given when their own call is the one that wins
+  // the race to run (a call arriving while a chain's already active is a no-op,
+  // silently dropping whatever onIdle it was passed) — so if only the opening-deal
+  // effect's own calls carried this check, a resize-triggered call winning that
+  // race instead would strand it forever, leaving dealt permanently false. Using
+  // the same idempotent function everywhere sidesteps that: it's a no-op until
+  // both phases have actually started and everything — including anything a
+  // resize queued along the way — has fully drained, however that drain ends up
+  // getting kicked off.
+  const maybeCompleteInitialDeal = () => {
+    if (initialDealCompletedRef.current) return
+    if (!initialManagerPhaseStartedRef.current || !initialPlayerPhaseStartedRef.current) return
+    if (managerDealerActive.current || playerDealerActive.current) return
+    if (pendingManagerDealsRef.current.length > 0 || pendingPlayerDealsRef.current.length > 0) return
+    initialDealCompletedRef.current = true
+    setDealt(true)
+  }
+
   // Picks a random still-unused message or conversation from across every channel —
   // once something is picked it's marked used by the caller so it never repeats for
   // the rest of the game.
@@ -624,6 +768,16 @@ function GameBoard() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    getSoundDurationMs('gm-action-vesting-full').then((ms) => {
+      if (!cancelled && ms != null) vestingFullDurationRef.current = ms
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     backlogRef.current = backlog
   }, [backlog])
   useEffect(() => {
@@ -635,6 +789,12 @@ function GameBoard() {
   useEffect(() => {
     vestingRef.current = vesting
   }, [vesting])
+  useEffect(() => {
+    handContentRef.current = hand
+  }, [hand])
+  useEffect(() => {
+    managerHandContentRef.current = managerHand
+  }, [managerHand])
 
   useEffect(() => {
     if (pageLoaded) return
@@ -725,6 +885,80 @@ function GameBoard() {
     return () => observer.disconnect()
   }, [])
 
+  // Keeps each hand's actual slot count equal to visibleHandCards instead of
+  // leaving the extra slots to scroll off-screen (see .hand-wrap/.manager-hand-wrap
+  // in GameBoard.css, which size themselves to exactly this many cards): shrinking
+  // returns whatever cards sat in the removed slots to the top of that side's draw
+  // pile rather than discarding them, and growing queues the newly available slots
+  // (always still empty, since they were just appended) for the effect below to
+  // deal fresh cards into once they exist in the DOM. Before the game's actually
+  // started, growth only resizes the arrays — nothing is queued, since the opening
+  // deal effect picks up whatever the current size is once it runs; queueing here
+  // too would double-deal into slots it's about to deal into itself.
+  // hand/managerHand are deliberately read via closure rather than listed as deps:
+  // this should only re-fire on an actual visibleHandCards/gameStarted/gameOver
+  // change, each time picking up whatever hand/managerHand are at that moment —
+  // listing them would also re-run this on every unrelated card play, which reads
+  // as fine (visibleHandCards === prevCount bails out immediately) but is still
+  // pointless churn this effect was never meant to react to.
+  useEffect(() => {
+    const prevCount = prevVisibleHandCardsRef.current
+    prevVisibleHandCardsRef.current = visibleHandCards
+    if (visibleHandCards === prevCount) return
+
+    if (visibleHandCards < prevCount) {
+      const keepCount = visibleHandCards
+      pendingPlayerDealsRef.current = pendingPlayerDealsRef.current.filter((i) => i < keepCount)
+      pendingManagerDealsRef.current = pendingManagerDealsRef.current.filter(
+        (id) => MANAGER_SLOT_IDS.indexOf(id) < keepCount,
+      )
+      // Mutating the draw piles has to happen here, outside the setHand/
+      // setManagerHand updaters below, rather than inside them — React (in
+      // StrictMode, in development) calls an updater function twice to help catch
+      // exactly this kind of impurity, and unshifting the returned cards from
+      // inside one would double-insert them into the pile, eventually dealing the
+      // same physical card into two hand slots at once.
+      const returnedPlayerCards = hand.slice(keepCount).filter((c): c is PlayerCard => c !== null)
+      if (returnedPlayerCards.length > 0) playerDrawPile.current.unshift(...returnedPlayerCards)
+      const returnedManagerCards = managerHand.slice(keepCount).filter((c): c is ManagerCard => c !== null)
+      if (returnedManagerCards.length > 0) managerDrawPile.current.unshift(...returnedManagerCards)
+
+      setHand((prev) => prev.slice(0, keepCount))
+      setManagerHand((prev) => prev.slice(0, keepCount))
+      setUsedManagerIds((prev) => {
+        const next = new Set(prev)
+        MANAGER_SLOT_IDS.slice(keepCount, prevCount).forEach((id) => next.delete(id))
+        return next
+      })
+    } else {
+      const newIndices = Array.from({ length: visibleHandCards - prevCount }, (_, i) => prevCount + i)
+      setHand((prev) => [...prev, ...Array(newIndices.length).fill(null)])
+      setManagerHand((prev) => [...prev, ...Array(newIndices.length).fill(null)])
+      setUsedManagerIds((prev) => {
+        const next = new Set(prev)
+        newIndices.forEach((i) => next.add(MANAGER_SLOT_IDS[i]))
+        return next
+      })
+      if (gameStarted && !gameOver) {
+        pendingPlayerDealsRef.current.push(...newIndices)
+        pendingManagerDealsRef.current.push(...newIndices.map((i) => MANAGER_SLOT_IDS[i]))
+      }
+    }
+  }, [visibleHandCards, gameStarted, gameOver])
+
+  // Makes sure a queue runner is actually going whenever either hand's slot count
+  // changes — covers the growth queued by the effect above once its new slots
+  // exist in the DOM for startPlayerDraw/startManagerDraw's own lookups to find
+  // (hand.length/managerHand.length only change once that's true), and is a no-op
+  // whenever there's nothing pending or a chain's already running. Passes
+  // maybeCompleteInitialDeal as onIdle same as the opening-deal effect itself does
+  // (see that function's comment for why every call site has to, not just that
+  // effect's own).
+  useEffect(() => {
+    runManagerDealQueue(maybeCompleteInitialDeal)
+    runPlayerDealQueue(maybeCompleteInitialDeal)
+  }, [hand.length, managerHand.length])
+
   // A 'coding' card naming a character is a follow-up to that character's own
   // 'character'-action introduction card, and can't be played on this side until
   // that introduction has resolved (see revealedCharacters above).
@@ -757,7 +991,14 @@ function GameBoard() {
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
     setActivePlayerCard(card)
     playerDiscard.current.push(card)
-    startPlayerDraw(slotIndex)
+    // Goes through the same queue a resize's growth deals use (see
+    // runPlayerDealQueue) rather than calling startPlayerDraw directly — that
+    // shares one timer bucket and one flight-animation slot across every draw, so
+    // calling it directly here while a growth deal is already mid-flight would
+    // cancel that flight out from under it. Queueing instead guarantees this draw
+    // waits its turn if one's already running, rather than colliding with it.
+    pendingPlayerDealsRef.current.push(slotIndex)
+    runPlayerDealQueue(maybeCompleteInitialDeal)
   }
 
   // Drops a card onto .discard-zone instead of playing it: no manager response, no
@@ -777,7 +1018,10 @@ function GameBoard() {
     playSound('gm-action-player-discard')
 
     if (!rect) {
-      startPlayerDraw(slotIndex)
+      // See handleDropCard's comment on why this goes through the queue instead of
+      // calling startPlayerDraw directly.
+      pendingPlayerDealsRef.current.push(slotIndex)
+      runPlayerDealQueue(maybeCompleteInitialDeal)
       return
     }
 
@@ -793,7 +1037,8 @@ function GameBoard() {
     discardTimers.current.push(
       window.setTimeout(() => {
         setDiscardEffect(null)
-        startPlayerDraw(slotIndex)
+        pendingPlayerDealsRef.current.push(slotIndex)
+        runPlayerDealQueue(maybeCompleteInitialDeal)
       }, DISCARD_DISINTEGRATE_DURATION_MS),
     )
   }
@@ -834,10 +1079,18 @@ function GameBoard() {
     vestingRef.current = 0
     cascadeSettling.current = false
     resultSequenceStarted.current = false
+    pendingPlayerDealsRef.current = []
+    pendingManagerDealsRef.current = []
+    prevVisibleHandCardsRef.current = visibleHandCards
+    managerDealerActive.current = false
+    playerDealerActive.current = false
+    initialManagerPhaseStartedRef.current = false
+    initialPlayerPhaseStartedRef.current = false
+    initialDealCompletedRef.current = false
 
-    setHand(Array(HAND_SIZE).fill(null))
-    setManagerHand(Array(MANAGER_SLOT_IDS.length).fill(null))
-    setUsedManagerIds(new Set(MANAGER_SLOT_IDS))
+    setHand(Array(visibleHandCards).fill(null))
+    setManagerHand(Array(visibleHandCards).fill(null))
+    setUsedManagerIds(new Set(MANAGER_SLOT_IDS.slice(0, visibleHandCards)))
     setDealt(false)
     setHiddenHandId(null)
     setHistory([])
@@ -903,34 +1156,30 @@ function GameBoard() {
   }, [draggingCard])
 
   // Deals the opening hands once the splash screen is dismissed AND the window has
-  // finished loading: all six manager cards fly in first (face-down the whole way,
-  // since they stay hidden until played), then all six player cards fly in and flip
-  // face-up as they land. Each draw's completion callback kicks off the next, so the
-  // deal reads as one card at a time rather than all twelve arriving in a pile.
+  // finished loading: all manager cards fly in first (face-down the whole way,
+  // since they stay hidden until played), then all player cards fly in and flip
+  // face-up as they land. Built on the same queue runners a later resize uses to
+  // top a hand back up (see the resize-sync effect above) rather than a bespoke
+  // loop of its own, so the two can never race each other or double-deal into a
+  // slot the other one's already claimed — enqueueMissingManagerDeals/
+  // enqueueMissingPlayerDeals always ask "what's actually still empty right now"
+  // (via handContentRef/managerHandContentRef) rather than assuming nothing could
+  // have changed since this effect started, which is exactly what a fast resize
+  // mid-deal would otherwise break. dealt only flips true once both this effect's
+  // own two phases AND anything a resize queued alongside them have fully drained.
   useEffect(() => {
     if (!gameStarted || !pageLoaded) return
 
     let cancelled = false
 
-    const dealPlayerCards = (index: number) => {
+    initialManagerPhaseStartedRef.current = true
+    enqueueMissingManagerDeals()
+    runManagerDealQueue(() => {
       if (cancelled) return
-      if (index >= HAND_SIZE) {
-        setDealt(true)
-        return
-      }
-      startPlayerDraw(index, () => dealPlayerCards(index + 1))
-    }
-
-    const dealManagerCards = (index: number) => {
-      if (cancelled) return
-      if (index >= MANAGER_SLOT_IDS.length) {
-        dealPlayerCards(0)
-        return
-      }
-      startManagerDraw(MANAGER_SLOT_IDS[index], () => dealManagerCards(index + 1))
-    }
-
-    dealManagerCards(0)
+      initialPlayerPhaseStartedRef.current = true
+      enqueueMissingPlayerDeals()
+      runPlayerDealQueue(maybeCompleteInitialDeal)
+    })
 
     return () => {
       cancelled = true
@@ -978,24 +1227,24 @@ function GameBoard() {
   }
 
   // Mirrors runLossSequence above, but for the single win condition: the vesting meter
-  // gets the same bright maxed glow (see meter-bar-fill-maxed in Meters.css) and the
-  // same gm-action-meter-full ding, and only once that beat has played out does the
-  // game actually end. Called explicitly once the round-resolve cascade's own four
-  // meter updates have all landed — using the live vestingRef, since that call site's
-  // plain vesting identifier is frozen mid-round (see cascadeSettling below) — and
-  // again by the win/lose effect below for vesting pushed over the line by a Slack
-  // message/conversation outside a round's own resolution. Returns whether it actually
-  // started the cascade.
+  // gets the same bright maxed glow (see meter-bar-fill-maxed in Meters.css), though its
+  // own gm-action-vesting-full ding instead of the danger meters' gm-action-meter-full,
+  // and only once that beat has played out does the game actually end. Called
+  // explicitly once the round-resolve cascade's own four meter updates have all landed
+  // — using the live vestingRef, since that call site's plain vesting identifier is
+  // frozen mid-round (see cascadeSettling below) — and again by the win/lose effect
+  // below for vesting pushed over the line by a Slack message/conversation outside a
+  // round's own resolution. Returns whether it actually started the cascade.
   const runWinSequence = () => {
     if (resultSequenceStarted.current) return true
     resultSequenceStarted.current = true
     setVestingMaxed(true)
-    playSound('gm-action-meter-full')
+    playSound('gm-action-vesting-full')
     // Completely stops the game — the round-start/Slack-pick effects below both bail
     // out once gameOver is set — and fades in the game-over splash, which holds off on
     // the "you win" video until its own fade-in finishes (see GameOverScreen).
     meterSequenceTimers.current.push(
-      window.setTimeout(() => setGameOver('win'), meterFullDurationRef.current),
+      window.setTimeout(() => setGameOver('win'), vestingFullDurationRef.current),
     )
     return true
   }
@@ -1119,7 +1368,10 @@ function GameBoard() {
               setUsedManagerIds((prev) => new Set(prev).add(id))
               setHiddenHandId(null)
               setFlight(null)
-              startManagerDraw(id)
+              // See handleDropCard's comment (near the top of the file) on why this
+              // goes through the queue instead of calling startManagerDraw directly.
+              pendingManagerDealsRef.current.push(id)
+              runManagerDealQueue(maybeCompleteInitialDeal)
             },
             300 + 550 + 450,
           ),
@@ -1165,13 +1417,20 @@ function GameBoard() {
       const playerIsRecurring = activePlayerCard.action === 'recurring'
       const managerIsRecurring = activeManagerCard.action === 'recurring' && !reversed && !cancelled
 
-      // A 'reset' card wipes both backlog and technical debt to 0 outright — reuses
-      // the same '*' clearable-delta sentinel applyClearableDelta already honors for
+      // A 'reset' card wipes backlog and/or technical debt to 0 outright — reuses the
+      // same '*' clearable-delta sentinel applyClearableDelta already honors for
       // per-card wildcard values, so it overrides every other contributing delta that
-      // round regardless of side.
-      const isReset =
-        activePlayerCard.action === 'reset' || (activeManagerCard.action === 'reset' && !reversed && !cancelled)
-      const resetSentinel: '*' | undefined = isReset ? '*' : undefined
+      // round regardless of side. Its `target` narrows this to a single stat ('techDebt'
+      // or 'backlog'); omitting `target` clears both, same as before targeted resets
+      // existed.
+      const resetTargets = (card: PlayerCard | ManagerCard) =>
+        card.action === 'reset' ? (card.target ?? null) : undefined
+      const playerResetTarget = resetTargets(activePlayerCard)
+      const managerResetTarget = !reversed && !cancelled ? resetTargets(activeManagerCard) : undefined
+      const resetSentinelFor = (stat: 'backlog' | 'techDebt'): '*' | undefined =>
+        [playerResetTarget, managerResetTarget].some((t) => t === null || t === stat) ? '*' : undefined
+      const backlogResetSentinel = resetSentinelFor('backlog')
+      const techDebtResetSentinel = resetSentinelFor('techDebt')
 
       // An 'eliminate' card stops the most recent still-active OPPOSING-side recurring
       // effect of the same type (searched before this round's own effects are pushed
@@ -1184,41 +1443,63 @@ function GameBoard() {
       // target:'character:{name}' un-reveals that specific character's card wherever
       // it sits in the play order — re-locking any 'coding' card naming it
       // (isCardLocked reads revealedCharacters live, so removing it here is all that's
-      // needed) — and lifts every suspension that character's own 'block recurring'
-      // effect caused, by matching on `suspendedBy` rather than category, so it can't
-      // disturb a block some other card caused.
-      const findEliminatedCharacterRoundId = (targetSide: 'player' | 'manager', characterName?: string) => {
+      // needed), lifts every suspension that character's own 'block recurring' effect
+      // caused (by matching on `suspendedBy` rather than category, so it can't disturb
+      // a block some other card caused), AND stops every still-active recurring effect
+      // on that side attributed to that same character (RecurringEffect.character) —
+      // both that character's card and every recurring card tied to them get flagged
+      // for the ELIMINATED overlay, distinct from the plain STOPPED one above.
+      const findEliminatedCharacterRoundIds = (targetSide: 'player' | 'manager', characterName?: string) => {
         const plays = characterPlays.current[targetSide]
         const index = characterName
           ? plays.findLastIndex((p) => p.character.toLowerCase() === characterName.toLowerCase())
           : plays.length - 1
-        if (index < 0) return null
+        if (index < 0) return []
         const [match] = plays.splice(index, 1)
         revealedCharacters.current[targetSide].delete(match.character)
+        const roundIds = [match.roundId]
         activeRecurringEffects.current.forEach((effect) => {
           if (effect.suspendedBy === match.roundId) effect.suspendedTurnsRemaining = 0
+          if (
+            !effect.stopped &&
+            effect.side === targetSide &&
+            effect.character?.toLowerCase() === match.character.toLowerCase()
+          ) {
+            effect.stopped = true
+            roundIds.push(effect.roundId)
+          }
         })
-        return match.roundId
+        return roundIds
       }
-      const findStoppedRoundId = (eliminatingCard: PlayerCard | ManagerCard, targetSide: 'player' | 'manager') => {
-        if (eliminatingCard.action !== 'eliminate') return null
-        if (eliminatingCard.target === 'character') return findEliminatedCharacterRoundId(targetSide)
+      const findEliminatedRoundIds = (
+        eliminatingCard: PlayerCard | ManagerCard,
+        targetSide: 'player' | 'manager',
+      ): { roundIds: string[]; eliminated: boolean } => {
+        if (eliminatingCard.action !== 'eliminate') return { roundIds: [], eliminated: false }
+        if (eliminatingCard.target === 'character') {
+          return { roundIds: findEliminatedCharacterRoundIds(targetSide), eliminated: true }
+        }
         if (eliminatingCard.target?.startsWith('character:')) {
-          return findEliminatedCharacterRoundId(targetSide, eliminatingCard.target.slice('character:'.length))
+          return {
+            roundIds: findEliminatedCharacterRoundIds(targetSide, eliminatingCard.target.slice('character:'.length)),
+            eliminated: true,
+          }
         }
         for (let i = activeRecurringEffects.current.length - 1; i >= 0; i--) {
           const effect = activeRecurringEffects.current[i]
           if (!effect.stopped && effect.side === targetSide && effect.category === eliminatingCard.category) {
             effect.stopped = true
-            return effect.roundId
+            return { roundIds: [effect.roundId], eliminated: false }
           }
         }
-        return null
+        return { roundIds: [], eliminated: false }
       }
-      const stoppedManagerRoundId = findStoppedRoundId(activePlayerCard, 'manager')
+      const managerElimination = findEliminatedRoundIds(activePlayerCard, 'manager')
       // A cancelled manager card had no effect this round, so it can't have eliminated
       // anything either.
-      const stoppedPlayerRoundId = cancelled ? null : findStoppedRoundId(activeManagerCard, 'player')
+      const playerElimination = cancelled
+        ? { roundIds: [], eliminated: false }
+        : findEliminatedRoundIds(activeManagerCard, 'player')
 
       // A 'block recurring' card suspends every still-active OPPOSING-side recurring
       // effect matching `target` (or every type, for '*') for `duration` turns —
@@ -1269,8 +1550,20 @@ function GameBoard() {
         ]
         return next.map((r) => ({
           ...r,
-          managerCardStopped: r.id === stoppedManagerRoundId ? true : r.managerCardStopped,
-          playerCardStopped: r.id === stoppedPlayerRoundId ? true : r.playerCardStopped,
+          managerCardStopped:
+            !managerElimination.eliminated && managerElimination.roundIds.includes(r.id)
+              ? true
+              : r.managerCardStopped,
+          playerCardStopped:
+            !playerElimination.eliminated && playerElimination.roundIds.includes(r.id) ? true : r.playerCardStopped,
+          managerCardEliminated:
+            managerElimination.eliminated && managerElimination.roundIds.includes(r.id)
+              ? true
+              : r.managerCardEliminated,
+          playerCardEliminated:
+            playerElimination.eliminated && playerElimination.roundIds.includes(r.id)
+              ? true
+              : r.playerCardEliminated,
           managerCardSuspendedTurns: managerSuspensionMap.get(r.id),
           playerCardSuspendedTurns: playerSuspensionMap.get(r.id),
         }))
@@ -1285,6 +1578,7 @@ function GameBoard() {
           roundId,
           side: 'player',
           category: activePlayerCard.category,
+          character: activePlayerCard.character,
           backlog: activePlayerCard.backlog,
           techDebt: activePlayerCard.techDebt,
           burnout: activePlayerCard.burnout,
@@ -1297,6 +1591,7 @@ function GameBoard() {
           roundId,
           side: 'manager',
           category: activeManagerCard.category,
+          character: activeManagerCard.character,
           backlog: activeManagerCard.backlog,
           techDebt: activeManagerCard.techDebt,
           burnout: activeManagerCard.burnout,
@@ -1377,10 +1672,10 @@ function GameBoard() {
       // message posts below, so that update reads as its own separate beat.
       const meterSteps: { changed: boolean; apply: () => void }[] = [
         {
-          changed: hasNonZeroDelta([playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]),
+          changed: hasNonZeroDelta([playerBacklog, managerBacklog, backlogResetSentinel, ...recurringBacklog]),
           apply: () => {
             setBacklog((prev) =>
-              applyClearableDelta(prev, [playerBacklog, managerBacklog, resetSentinel, ...recurringBacklog]),
+              applyClearableDelta(prev, [playerBacklog, managerBacklog, backlogResetSentinel, ...recurringBacklog]),
             )
             setBacklogFlashKey((k) => k + 1)
           },
@@ -1389,7 +1684,7 @@ function GameBoard() {
           changed: hasNonZeroDelta([
             playerTechDebt,
             managerTechDebt,
-            resetSentinel,
+            techDebtResetSentinel,
             ...recurringTechDebt,
           ]),
           apply: () => {
@@ -1397,7 +1692,7 @@ function GameBoard() {
               applyClearableDelta(prev, [
                 playerTechDebt,
                 managerTechDebt,
-                resetSentinel,
+                techDebtResetSentinel,
                 ...recurringTechDebt,
               ]),
             )
@@ -1529,7 +1824,11 @@ function GameBoard() {
             <Deck image="/cards/pc-manager-back-image.webp" count={30} />
           </div>
           <div className="manager-hand-wrap" ref={managerHandRef}>
-            <ManagerHand ids={MANAGER_SLOT_IDS} usedIds={usedManagerIds} hiddenId={hiddenHandId} />
+            <ManagerHand
+              ids={MANAGER_SLOT_IDS.slice(0, managerHand.length)}
+              usedIds={usedManagerIds}
+              hiddenId={hiddenHandId}
+            />
           </div>
         </div>
       </div>

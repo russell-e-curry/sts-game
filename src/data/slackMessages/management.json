@@ -86,5 +86,91 @@
         "burnout": 10
       }
     ]
+  },
+ {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "CMO",
+        "text": "Hey team, I was chatting with an investor and he asked if our login page uses blockchain 👀"
+      },
+      {
+        "character": "VP",
+        "text": "Interesting. What would blockchain even do for a login page?"
+      },
+      {
+        "character": "CMO",
+        "text": "Does it matter? He said Web3 like four times and his fund is closing next month."
+      },
+      {
+        "character": "VP",
+        "text": "Say less. Let's get ahead of this. PM, can you scope it?"
+      },
+      {
+        "character": "PM",
+        "text": "Scope what exactly, adding blockchain to... authentication?"
+      },
+      {
+        "character": "CMO",
+        "text": "Just make it decentralized-sounding. Maybe a little globe icon that spins."
+      },
+      {
+        "character": "VP",
+        "text": "Love the globe. Very trustworthy. Ships trust."
+      },
+      {
+        "character": "PM",
+        "text": "To be clear, we currently use email and password. There is no chain to block."
+      },
+      {
+        "character": "CMO",
+        "text": "Then we invent one! Innovation is just marketing with extra steps."
+      },
+      {
+        "character": "VP",
+        "text": "PM I'm gonna need this by the investor call Thursday, can we make that happen?"
+      },
+      {
+        "character": "PM",
+        "text": "Sounds good, I'll get the team right on it!",
+        "backlog": 25,
+        "burnout": 10
+      }
+    ]
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
+        "character": "CMO",
+        "text": "Hey team! Just got off a quick sync with a tier-one enterprise prospect. They love the platform, but they just need one tiny feature to sign the contract by Monday morning." 
+      },
+      {
+        "character": "CMO",
+        "text": "Can we quickly throw together custom multi-tenant SSO, localized PDF invoices for all languages, and a real-time data export? Should only take a couple of hours! ✨🚀"
+      },
+      {
+        "character": "VP",
+        "text": "Sure thing, I can handle localization - I've been learning Mandarin Chinese on the Duo Lingo free plan."
+      },
+      {
+        "character": "CMO",
+        "text": "And I've heard Mandarin is the hardest, you should be able to pick up all the other ones easy."
+      },
+      {
+        "character": "PM",
+        "text": "Multi-tenant SSO? We're a B2C company, not B2B, what would we need that for?"
+      },
+      {
+        "character": "CMO",
+        "text": "Oh yeah, I forgot to tell you about the pivot..."
+      },
+      {
+        "character": "PM",
+        "text": "Okay, no worries - send me the requirements for the SSO and the data export, I'll have the team get on it.",
+        "backlog" : 25,
+        "burnout" : 25
+      }
+    ]
   }
 ]

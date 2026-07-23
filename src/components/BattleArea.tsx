@@ -15,6 +15,12 @@ export interface ResolvedRound {
   /** Set once a manager 'eliminate' card of the same type stops this round's player
    * recurring effect — renders the STOPPED overlay on the player's card. */
   playerCardStopped?: boolean
+  /** Set once a player 'eliminate' + target:'character' card takes down this round's
+   * manager card — either it's the character card itself or a recurring card
+   * attributed to that character — renders the ELIMINATED overlay on it. */
+  managerCardEliminated?: boolean
+  /** Same as `managerCardEliminated`, for this round's player card. */
+  playerCardEliminated?: boolean
   /** Set when this round's player card has action 'cancel' — neutralizes the
    * manager's card this same round and renders the CANCELLED overlay on it. */
   managerCardCancelled?: boolean
@@ -182,6 +188,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
                   card={round.managerCard}
                   played
                   stopped={round.managerCardStopped}
+                  eliminated={round.managerCardEliminated}
                   cancelled={round.managerCardCancelled}
                   suspendedTurns={round.managerCardSuspendedTurns}
                 />
@@ -191,6 +198,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
                   card={round.playerCard}
                   played
                   stopped={round.playerCardStopped}
+                  eliminated={round.playerCardEliminated}
                   suspendedTurns={round.playerCardSuspendedTurns}
                 />
               </div>

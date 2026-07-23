@@ -1,0 +1,11 @@
+{
+  "title": "Hire an Intern",
+  "category": "Management",
+  "type" : "character",
+  "action": "character",
+  "character" : "intern-1",
+  "description": "No budget, no problem - this guy will work for free. He'll come to regret it but not he clears some tickets.",
+  "backlog" : -10,
+  "techDebt" : -10
+
+}

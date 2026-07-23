@@ -1,5 +1,6 @@
 {
   "title": "Team Lunch",
+  "type" : "Eliminate",
   "category": "management",
   "action": "eliminate",
   "target": "character:gc",

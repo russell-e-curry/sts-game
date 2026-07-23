@@ -10,7 +10,7 @@ export interface SlackMessageJson {
   techDebt?: number
   /** Signed delta applied to burnout when this message is posted (positive = more burnout). Omit if it doesn't touch it. */
   burnout?: number
-  /** Signed percentage delta applied to vesting when this message is posted. Omit if it doesn't touch it. */
+  /** Signed point delta applied to vesting when this message is posted (max 100). Omit if it doesn't touch it. */
   vesting?: number
 }
 

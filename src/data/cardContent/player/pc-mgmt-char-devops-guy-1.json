@@ -1,0 +1,9 @@
+{
+  "title": "DevOps Guy",
+  "category": "management",
+  "action": "character",
+  "character": "DevOps Guy",
+  "description": "You bring on a new DevOps guy, looks like he's got his work cut out for him.",
+  "techDebt": -10,
+  "burnout": -15
+}

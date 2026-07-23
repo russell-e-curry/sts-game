@@ -14,6 +14,7 @@ export type SoundName =
   | 'gm-action-slack-message'
   | 'gm-action-meter-up'
   | 'gm-action-meter-full'
+  | 'gm-action-vesting-full'
 
 // iOS Safari only lets a freshly-created <audio>/AudioContext start playback when
 // that call happens synchronously inside a user-gesture handler. Most of this game's
