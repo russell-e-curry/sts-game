@@ -1,0 +1,8 @@
+{
+  "title": "Navigation Failure",
+  "type" : "Eliminate",
+  "category": "Management",
+  "action": "eliminate",
+  "target": { "kind": "character", "selector": "named", "name": "Consultants" },
+  "description": "You may have given the consultants the wrong address for the meeting. They get waymo than they bargained for."
+}

@@ -2,7 +2,8 @@
   "title": "Consultants",
   "category": "Management",
   "type" : "Character",
-  "action": "recurring",
+  "action": "character",
+  "character" : "Consultants",
   "description": "Your boss hires a software consulting firm, they'll get fat stacks, you'll get more meetings",
   "backlog": 5,
   "burnout": 5

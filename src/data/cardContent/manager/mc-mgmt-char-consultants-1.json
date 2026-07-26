@@ -1,10 +1,10 @@
 {
   "title": "Cloud Integration",
-  "category": "Coding",
+  "category": "coding",
   "type" : "Recurring",
   "character" : "Consultants",
   "description": "Nothing says successful startup like cloud-integrated vending machines. It's not a break room, it's an Internet of Things!",
-  "action" : "Recurring",
+  "action" : "recurring",
   "backlog" : 5,
   "techDebt" : 5
 
