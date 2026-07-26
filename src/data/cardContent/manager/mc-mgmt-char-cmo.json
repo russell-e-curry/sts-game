@@ -1,0 +1,9 @@
+{
+  "title": "CMO",
+  "category": "Management",
+  "type" : "Character",
+  "action": "character",
+  "character" : "cmo",
+  "description": "The boss hires a Chief Marketing Officer, who immediately starts expensing 'team offsites'.",
+  "burnout": 10
+}

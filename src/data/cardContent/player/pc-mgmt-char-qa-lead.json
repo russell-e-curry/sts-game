@@ -1,0 +1,10 @@
+{
+  "title": "QA Lead",
+  "category": "Management",
+  "type": "character",
+  "action": "recurring",
+  "character": "QA Lead",
+  "description": "Someone's finally testing before it ships. Backlog and tech debt tick down every turn he's on the team.",
+  "backlog": -5,
+  "techDebt": -5
+}

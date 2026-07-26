@@ -2,6 +2,7 @@
   "title": "Rubber Duck",
   "category": "wellness",
   "action": "one time",
+  "playableAgainst": ["*"],
   "description": "Talk it through with the duck. Come up with some new ideas.",
   "techDebt": -25,
   "burnout": -25

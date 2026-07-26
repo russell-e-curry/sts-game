@@ -2,6 +2,7 @@
   "title": "Extended PTO",
   "category": "wellness",
   "action": "one time",
+  "playableAgainst": ["*"],
   "description": "Ah, a few days off in the great outdoors. Also, your dog brought you this bear.",
   "burnout": -50,
   "vesting": 100

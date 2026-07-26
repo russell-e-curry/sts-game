@@ -79,6 +79,18 @@
   cursor: grabbing;
 }
 
+/* A manager 'blur' card's effect — obscures the card's text and art without hiding
+   the card itself, so the player still sees a crisp card (shape, face, border) sitting
+   in the hand/dropzone/history, just can't read what's on it. Targets the template's
+   direct children individually (header, name, art frame, body, footer, action badge)
+   rather than the template or root — blurring either of those would soften the face's
+   own background/border along with the content sitting on it. cqw-based like the rest
+   of the template so the blur scales with the card, staying just as illegible whether
+   it's hand-sized or hover-enlarged. */
+.game-card-blurred .game-card-template > * {
+  filter: blur(3.6cqw);
+}
+
 /* Recurring cards breathe: the whole card dims and brightens in place, rather than
    any kind of border/edge glow. */
 .game-card-recurring {
@@ -223,6 +235,51 @@
   transform: rotate(-8deg);
 }
 
+/* Same two-line layout as .game-card-suspended-overlay (label + countdown), but no
+   background stripe of its own — just the two lines of text, floating over the
+   already-blurred content (see .game-card-blurred) rather than adding another layer
+   on top of it. */
+.game-card-blurred-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqw;
+  pointer-events: none;
+}
+
+/* The "double vision" look: a red and a cyan copy of the glyphs, offset to opposite
+   sides and each slightly soft-edged, ghosting off the solid white text between them
+   — the same trick as an old red/cyan anaglyph image, applied to text-shadow instead
+   of a second image layer. The dark contact shadow underneath keeps it legible over
+   whatever's showing through the blur behind it. */
+.game-card-blurred-label {
+  font-size: 12cqw;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow:
+    2.6cqw 0 0.9cqw rgba(255, 60, 60, 0.85),
+    -2.6cqw 0 0.9cqw rgba(60, 220, 255, 0.85),
+    0 2px 6px rgba(0, 0, 0, 0.9);
+  transform: rotate(-8deg);
+  text-align: center;
+}
+
+.game-card-blurred-turns {
+  font-size: 6cqw;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow:
+    1.5cqw 0 0.6cqw rgba(255, 60, 60, 0.85),
+    -1.5cqw 0 0.6cqw rgba(60, 220, 255, 0.85),
+    0 2px 6px rgba(0, 0, 0, 0.9);
+  transform: rotate(-8deg);
+}
+
 .game-card-template {
   width: 100%;
   height: 100%;
@@ -246,8 +303,10 @@
   line-height: 1.2;
 }
 
-/* Recurring cards get a light silver face instead of the usual dark one; the
-   text/body colors below flip to dark so they stay readable against it. */
+/* A card whose `type` reads "recurring" gets a light silver face instead of the usual
+   dark one (see Card.tsx's typeTemplateClass — keyed off the cosmetic `type` label,
+   not the actual `action`, so a card can look the part without necessarily behaving
+   like one); the text/body colors below flip to dark so they stay readable against it. */
 .game-card-template-recurring {
   background: linear-gradient(160deg, #f2f3f5, #c7cbd1);
 }
@@ -264,11 +323,11 @@
   background: rgba(255, 255, 255, 0.4);
 }
 
-/* Eliminate-action cards get a dark maroon face instead of the default charcoal —
-   close enough to the default dark-card look that the base white/off-white text
-   colors still work unchanged, but tinted red to read as a warning. The silver
-   badge (see .game-card-eliminate-badge) stays the one high-contrast accent instead
-   of competing with a red face. */
+/* A card whose `type` reads "eliminate" gets a dark maroon face instead of the
+   default charcoal — close enough to the default dark-card look that the base
+   white/off-white text colors still work unchanged, but tinted red to read as a
+   warning. The silver badge (see .game-card-eliminate-badge) stays the one
+   high-contrast accent instead of competing with a red face. */
 .game-card-template-eliminate {
   background: linear-gradient(160deg, #3a0a0a, #160404);
 }
@@ -337,14 +396,32 @@
   box-shadow: 0 0 10px rgba(183, 188, 196, 0.6);
 }
 
+/* Same cool blue used for the suspended overlay, so "blur" reads as the same kind of
+   vision/perception debuff rather than the red eliminate warning or gold reset
+   positive. */
+.game-card-blur-badge {
+  flex-shrink: 0;
+  padding: 2.67cqw 4cqw;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7aa0ff, #2a4faa);
+  color: #fff;
+  font-size: 5.33cqw;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.27cqw;
+  box-shadow: 0 0 10px rgba(42, 79, 170, 0.6);
+}
+
 .game-card-template-recurring .game-card-rules {
   color: #1a1b20;
 }
 
-/* Character-attribution cards get a bright gold face — the same gold used for the
-   reset badge and vesting stat pills — so a card centered on a specific person
-   stands out rather than blending into the default charcoal face. Text flips dark,
-   same approach as the recurring card's light silver face above. */
+/* A card whose `type` reads "character" gets a bright gold face — the same gold used
+   for the reset badge and vesting stat pills — so a card centered on a specific
+   person stands out rather than blending into the default charcoal face, regardless
+   of what its `action` actually does (e.g. pc-mgmt-char-qa-lead.json: type
+   'character', action 'recurring', still gets this face). Text flips dark, same
+   approach as the recurring card's light silver face above. */
 .game-card-template-character {
   background: linear-gradient(160deg, #ffd76a, #d4a017);
 }
@@ -448,15 +525,15 @@
   line-height: 1.35;
 }
 
-/* Fixed left/center/right slots so each stat always lands in the same spot on the
-   card regardless of which subset of backlog/vesting/burnout a given card defines —
-   grid placement (below) keys off each stat's own class rather than DOM order, so a
-   card missing e.g. backlog doesn't shift vesting/burnout out of their corners. */
+/* Every stat the card actually defines (backlog, tech debt, vesting, burnout, in that
+   order — see Card.tsx) gets its own badge; wraps to a second line rather than
+   shrinking/clipping on a card that happens to define all four at once. */
 .game-card-footer {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4cqw;
+  justify-content: center;
+  gap: 2cqw 4cqw;
 }
 
 .game-card-stat {
@@ -470,24 +547,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Slot = where in the footer a stat sits (left/center/right corner), independent of
-   which stat is occupying it — backlog and technical debt share the left slot (see
-   Card.tsx, which renders at most one of them) but need different colors. */
-.game-card-stat-slot-left {
-  grid-column: 1;
-  justify-self: start;
-}
-
-.game-card-stat-slot-center {
-  grid-column: 2;
-  justify-self: center;
-}
-
-.game-card-stat-slot-right {
-  grid-column: 3;
-  justify-self: end;
 }
 
 /* Flat fills, not gradients: a gradient forces one text color to sit against two

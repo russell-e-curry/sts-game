@@ -192,6 +192,17 @@
   animation: battle-slot-glow 1.8s ease-in-out infinite;
 }
 
+/* Same idea as .battle-slot-placeholder-player, shown in the manager's slot instead
+   while the manager leads the round (see BattleArea's `leader` prop) and hasn't
+   played its opening card yet. */
+.battle-slot-placeholder-manager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  animation: battle-slot-glow 1.8s ease-in-out infinite;
+}
+
 .battle-slot-placeholder-label {
   margin: 0;
   padding: 0 10%;

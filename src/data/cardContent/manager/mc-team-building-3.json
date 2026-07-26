@@ -1,6 +1,6 @@
 {
   "title": "Team Building",
-  "category": "management",
+  "category": "Management",
   "action": "one time",
   "description": "If it starts with \"Hold my beer!\" it's not going to end well. The devops team is about to get smaller.",
   "techDebt": 100,

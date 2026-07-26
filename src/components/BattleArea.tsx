@@ -15,9 +15,9 @@ export interface ResolvedRound {
   /** Set once a manager 'eliminate' card of the same type stops this round's player
    * recurring effect — renders the STOPPED overlay on the player's card. */
   playerCardStopped?: boolean
-  /** Set once a player 'eliminate' + target:'character' card takes down this round's
-   * manager card — either it's the character card itself or a recurring card
-   * attributed to that character — renders the ELIMINATED overlay on it. */
+  /** Set once a player 'eliminate' card with a `{ kind: 'character' }` target takes
+   * down this round's manager card — either it's the character card itself or a
+   * recurring card attributed to that character — renders the ELIMINATED overlay on it. */
   managerCardEliminated?: boolean
   /** Same as `managerCardEliminated`, for this round's player card. */
   playerCardEliminated?: boolean
@@ -36,15 +36,25 @@ interface BattleAreaProps {
   history: ResolvedRound[]
   activePlayerCard: PlayerCard | null
   activeManagerCard: ManagerCard | null
+  /** Which side leads the current round — shown as "Manager's Turn"/"Player's Turn"
+   * in whichever slot is still waiting on that side's opening play (see GameBoard's
+   * `leader`). Has no bearing on the responding side's own slot, which always falls
+   * back to its normal empty-state placeholder. */
+  leader: 'manager' | 'player'
   /** Briefly shown in the player's active-column slot when a locked card is dropped
    * there instead of played (see GameBoard's showLockMessage). */
   lockMessage?: string | null
+  /** Turns left that a manager 'blur' card's effect is active for — applied to every
+   * card in both the dropzone (active-column) and history, on both sides, since
+   * they're the shared board areas a blur card obscures alongside the player's own
+   * hand (see Hand's `blurredTurns` prop and Card's). */
+  blurredTurns?: number
 }
 
 const MIN_THUMB_WIDTH = 40
 
 const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleArea(
-  { history, activePlayerCard, activeManagerCard, lockMessage },
+  { history, activePlayerCard, activeManagerCard, leader, lockMessage, blurredTurns },
   activeSlotRef,
 ) {
   const historyRowRef = useRef<HTMLDivElement>(null)
@@ -191,6 +201,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
                   eliminated={round.managerCardEliminated}
                   cancelled={round.managerCardCancelled}
                   suspendedTurns={round.managerCardSuspendedTurns}
+                  blurredTurns={blurredTurns}
                 />
               </div>
               <div className="battle-slot">
@@ -200,6 +211,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
                   stopped={round.playerCardStopped}
                   eliminated={round.playerCardEliminated}
                   suspendedTurns={round.playerCardSuspendedTurns}
+                  blurredTurns={blurredTurns}
                 />
               </div>
             </div>
@@ -228,7 +240,11 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
       <div className="active-column">
         <div className="battle-slot" ref={activeSlotRef}>
           {activeManagerCard ? (
-            <Card card={activeManagerCard} />
+            <Card card={activeManagerCard} blurredTurns={blurredTurns} />
+          ) : leader === 'manager' || activePlayerCard ? (
+            <div className="battle-slot-placeholder battle-slot-placeholder-manager">
+              <p className="battle-slot-placeholder-label">Manager's Turn</p>
+            </div>
           ) : (
             <div className="battle-slot-placeholder" />
           )}
@@ -236,17 +252,23 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
         <div className="battle-slot">
           {activePlayerCard ? (
             <>
-              <Card card={activePlayerCard} />
+              <Card card={activePlayerCard} blurredTurns={blurredTurns} />
               <SparkleBurst />
             </>
           ) : lockMessage ? (
             <div className="battle-slot-placeholder battle-slot-placeholder-player battle-slot-placeholder-locked">
               <p className="battle-slot-placeholder-label battle-slot-placeholder-label-locked">{lockMessage}</p>
             </div>
-          ) : (
+          ) : activeManagerCard ? (
             <div className="battle-slot-placeholder battle-slot-placeholder-player">
               <p className="battle-slot-placeholder-label">Play a Card</p>
             </div>
+          ) : leader === 'player' ? (
+            <div className="battle-slot-placeholder battle-slot-placeholder-player">
+              <p className="battle-slot-placeholder-label">Your Turn</p>
+            </div>
+          ) : (
+            <div className="battle-slot-placeholder" />
           )}
         </div>
       </div>

@@ -1,8 +1,8 @@
 {
   "title": "Team Lunch",
   "type" : "Eliminate",
-  "category": "management",
+  "category": "Management",
   "action": "eliminate",
-  "target": "character:gc",
-  "description": "They don't call it the break room for nothing. The General Counsel will be out to lunch for longer than expected."
+  "target": { "kind": "character", "selector": "named", "name": "gc" },
+  "description": "They don't call it the break room for nothing. This time it's the general counsel's hip. He'll be out for a while."
 }

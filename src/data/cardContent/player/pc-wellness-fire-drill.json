@@ -1,0 +1,9 @@
+{
+  "title": "Fire Drill",
+  "category": "wellness",
+  "type" : "Cancel",
+  "action": "cancel",
+  "playableAgainst": ["*"],
+  "description": "Oops, somebody accidentally pulled the fire alarm. Looks like nobody's getting anything today."
+
+}

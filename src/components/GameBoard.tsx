@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import type { ManagerCard, PlayerCard } from '../types'
+import type { CardTarget } from '../data/cardContent/schema'
 import { sampleHand } from '../data/cards'
 import { sampleManagerCards } from '../data/managerCards'
 import { shuffle } from '../lib/shuffle'
@@ -236,6 +237,11 @@ function GameBoard() {
   // Briefly shown in the active column's player slot when a locked card is dropped
   // there — cleared by lockMessageTimer below after a few seconds.
   const [lockMessage, setLockMessage] = useState<string | null>(null)
+  // Turns left that a manager 'action: blur' card has blurred the player's hand and
+  // the shared dropzone/history for — Infinity blurs for the rest of the game. 0
+  // means not blurred. Ticks down alongside recurring suspensions in the same
+  // round-resolve step (see the suspendedTurnsRemaining decrement loop).
+  const [blurTurnsRemaining, setBlurTurnsRemaining] = useState(0)
   const [backlog, setBacklog] = useState(0)
   const [techDebt, setTechDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
@@ -260,6 +266,14 @@ function GameBoard() {
   // glow through the win sequence and into the game-over fade-in.
   const [vestingMaxed, setVestingMaxed] = useState(false)
   const [roundKey, setRoundKey] = useState(0)
+  // Which side plays first this round — the round-start effect only auto-plays the
+  // manager's card while this is 'manager'; while it's 'player', that effect no-ops
+  // and waits for the player to drop a card into the (otherwise empty) active slot
+  // instead (see handleDropCard's `leading` case), after which the manager
+  // auto-responds (see the effect right after the round-start one). Flipped every
+  // round alongside roundKey (see the meter cascade's final step) so the two sides
+  // strictly alternate who leads.
+  const [leader, setLeader] = useState<'manager' | 'player'>('manager')
   // Set once backlog/technical debt/burnout hits its cap (lose) or vesting hits 100%
   // (win) — see the effect below. Also gates the round-start effect so the manager
   // stops playing cards once the game has ended.
@@ -431,8 +445,8 @@ function GameBoard() {
   const activeRecurringEffects = useRef<RecurringEffect[]>([])
   // Names of characters whose 'character'-action card has resolved on their side —
   // once added, stays forever (nothing currently un-introduces a character). Gates
-  // isCardLocked below: a 'coding' card naming a character can't be played on that
-  // side until that character's own introduction card has landed.
+  // isCardLocked below: a 'coding' or 'meetings' card naming a character can't be
+  // played on that side until that character's own introduction card has landed.
   const revealedCharacters = useRef<{ player: Set<string>; manager: Set<string> }>({
     player: new Set(),
     manager: new Set(),
@@ -959,11 +973,11 @@ function GameBoard() {
     runPlayerDealQueue(maybeCompleteInitialDeal)
   }, [hand.length, managerHand.length])
 
-  // A 'coding' card naming a character is a follow-up to that character's own
-  // 'character'-action introduction card, and can't be played on this side until
-  // that introduction has resolved (see revealedCharacters above).
+  // A 'coding' or 'meetings' card naming a character is a follow-up to that
+  // character's own 'character'-action introduction card, and can't be played on
+  // this side until that introduction has resolved (see revealedCharacters above).
   const isCardLocked = (card: PlayerCard | ManagerCard, side: 'player' | 'manager') =>
-    card.category === 'coding' &&
+    (card.category === 'coding' || card.category === 'meetings') &&
     card.action !== 'character' &&
     !!card.character &&
     !revealedCharacters.current[side].has(card.character)
@@ -977,8 +991,32 @@ function GameBoard() {
     lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
   }
 
+  // Which manager card categories a player card is allowed to respond to —
+  // defaults to only its own category (e.g. 'coding' vs 'coding') when the JSON
+  // omits playableAgainst; '*' in the list allows any category (used by wellness
+  // cards, which can be played on any turn regardless of what the manager led with).
+  const canPlayAgainst = (card: PlayerCard, managerCard: ManagerCard) => {
+    const allowed = (card.playableAgainst ?? [card.category]).map((c) => c.toLowerCase())
+    const managerCategory = managerCard.category.toLowerCase()
+    return allowed.includes('*') || allowed.includes(managerCategory)
+  }
+
+  // Shown in the active column's player slot for a few seconds, then cleared —
+  // called instead of actually playing a card that can't respond to the manager's
+  // current card (see canPlayAgainst/handleDropCard).
+  const showMismatchMessage = (managerCategory: string) => {
+    if (lockMessageTimer.current != null) window.clearTimeout(lockMessageTimer.current)
+    setLockMessage(`This card can't be played against a "${managerCategory}" card`)
+    lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
+  }
+
   const handleDropCard = (cardId: string) => {
-    if (!activeManagerCard || activePlayerCard) return
+    // Normally the player can only drop a card once the manager's has landed
+    // (responding to it). While the player leads the round instead (see `leader`),
+    // the active slot starts empty and this is the play that starts the round — so
+    // there's no manager card yet to lock the drop behind or match categories against.
+    const leading = leader === 'player' && !activeManagerCard
+    if (activePlayerCard || (!activeManagerCard && !leading)) return
     const slotIndex = hand.findIndex((c) => c?.id === cardId)
     if (slotIndex === -1) return
     const card = hand[slotIndex]!
@@ -986,6 +1024,10 @@ function GameBoard() {
     // card to snap back to its resting slot once the drag ends.
     if (isCardLocked(card, 'player')) {
       showLockMessage(card.character!)
+      return
+    }
+    if (!leading && !canPlayAgainst(card, activeManagerCard!)) {
+      showMismatchMessage(activeManagerCard!.category)
       return
     }
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
@@ -1101,6 +1143,7 @@ function GameBoard() {
     setManagerDrawFlight(null)
     setDiscardEffect(null)
     setLockMessage(null)
+    setBlurTurnsRemaining(0)
     setBacklog(0)
     setTechDebt(0)
     setBurnout(STARTING_BURNOUT)
@@ -1114,6 +1157,7 @@ function GameBoard() {
     setBurnoutMaxed(false)
     setVestingMaxed(false)
     setRoundKey(0)
+    setLeader('manager')
     setGameOver(null)
     setSlackMessages([])
     setActiveSlackChannel(CHANNEL_ORDER[0])
@@ -1263,132 +1307,170 @@ function GameBoard() {
     runLossSequence(backlog, techDebt, burnout)
   }, [backlog, techDebt, burnout, vesting, gameOver])
 
-  // The manager opens every round by playing a card into the top slot; the player
-  // only gets to respond once it's landed (see handleDropCard).
+  // Picks the manager's best card in hand and flies it into the active slot — shared
+  // by the two effects below: one calls this to lead the round (leader === 'manager'),
+  // the other calls it to respond once the player has led instead (leader ===
+  // 'player'). Which one applies has no bearing on the selection/animation itself, so
+  // there's nothing here that needs to know which side went first.
+  const autoPlayManagerCard = () => {
+    const hasEligiblePlayerRecurringTarget = (category: string) =>
+      activeRecurringEffects.current.some((e) => !e.stopped && e.side === 'player' && e.category === category)
+
+    // A 'block recurring' card carries no stat deltas of its own (see the damage
+    // heuristic below), so without this it would always score 0 and lose out to
+    // almost anything else in hand. It's only worth playing when there's an
+    // active, not-already-suspended player recurring effect it would actually
+    // suspend — matching `target`, or any type for '*'.
+    const hasEligibleBlockTarget = (c: ManagerCard) => {
+      if (c.effect !== 'block recurring' || c.target?.kind !== 'category') return false
+      const target = c.target
+      return activeRecurringEffects.current.some(
+        (e) =>
+          !e.stopped &&
+          e.side === 'player' &&
+          !((e.suspendedTurnsRemaining ?? 0) > 0) &&
+          (target.category === '*' || e.category === target.category),
+      )
+    }
+
+    const handEntries = managerHand
+      .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
+      .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
+      .filter((entry) => !isCardLocked(entry.card, 'manager'))
+    if (handEntries.length === 0) return
+
+    // Normalized (percent-of-max) estimate of how much playing this card would
+    // hurt the player — the higher, the more damaging. '*' and 'reset' clear a
+    // stat to 0, which only helps the player, so they're scored as improving
+    // (negative) that stat rather than raising it.
+    const damage = (c: ManagerCard) => {
+      const backlogDelta = c.action === 'reset' || c.backlog === '*' ? -backlog : (c.backlog ?? 0)
+      const techDebtDelta =
+        c.action === 'reset' || c.techDebt === '*' ? -techDebt : (c.techDebt ?? 0)
+      return (
+        backlogDelta / STAT_MAX +
+        techDebtDelta / STAT_MAX +
+        (c.burnout ?? 0) / BURNOUT_MAX -
+        (c.vesting ?? 0) / VESTING_MAX
+      )
+    }
+
+    // A 'blur' card outranks every other consideration — the disorientation it
+    // buys is worth more than any single round's stat hit or a stopped recurring
+    // effect, so the manager always leads with one the moment it's drawn. Only
+    // eligible while nothing's currently blurred, though: refreshing an
+    // already-running blur wastes the turn for (at best) a few extra turns of the
+    // same effect, so it drops back to the tiers below until the current one lapses.
+    const eligibleBlur = handEntries.filter((e) => e.card.action === 'blur' && blurTurnsRemaining === 0)
+
+    // An eliminate card with something in hand eligible to eliminate takes
+    // priority over raw damage — shutting down an active player recurring card
+    // outweighs a one-off stat hit — and otherwise the manager plays whatever in
+    // hand would hurt the player most. A block-recurring card with something
+    // eligible to suspend gets the same priority treatment, one tier below
+    // eliminate (permanently stopping a recurring card beats temporarily pausing
+    // one, when both are available).
+    const eligibleEliminate = handEntries.filter(
+      (e) => e.card.action === 'eliminate' && hasEligiblePlayerRecurringTarget(e.card.category),
+    )
+    const eligibleBlock = handEntries.filter((e) => hasEligibleBlockTarget(e.card))
+    const pool =
+      eligibleBlur.length > 0
+        ? eligibleBlur
+        : eligibleEliminate.length > 0
+          ? eligibleEliminate
+          : eligibleBlock.length > 0
+            ? eligibleBlock
+            : handEntries
+    const chosen = pool.reduce((best, e) => (damage(e.card) > damage(best.card) ? e : best))
+    const { card, id } = chosen
+
+    const sourceEl = managerHandRef.current?.querySelector(`[data-card-id="${id}"]`)
+    const destEl = activeSlotRef.current
+    if (!sourceEl || !destEl) return
+
+    const s = sourceEl.getBoundingClientRect()
+    const d = destEl.getBoundingClientRect()
+
+    setHiddenHandId(id)
+    setFlight({
+      key: ++flightKeyCounter.current,
+      card,
+      source: { top: s.top, left: s.left, width: s.width, height: s.height },
+      dest: { top: d.top, left: d.left, width: d.width, height: d.height },
+      flipped: false,
+      arrived: false,
+    })
+
+    timers.current.push(
+      window.setTimeout(() => {
+        setFlight((f) => (f ? { ...f, flipped: true } : f))
+        playSound('mc-action-flip-card')
+      }, 300),
+    )
+
+    timers.current.push(
+      window.setTimeout(() => setFlight((f) => (f ? { ...f, arrived: true } : f)), 300 + 550),
+    )
+
+    timers.current.push(
+      window.setTimeout(
+        () => {
+          setActiveManagerCard(card)
+          managerDiscard.current.push(card)
+          setManagerHand((prev) => prev.map((c, i) => (MANAGER_SLOT_IDS[i] === id ? null : c)))
+          setUsedManagerIds((prev) => new Set(prev).add(id))
+          setHiddenHandId(null)
+          setFlight(null)
+          // See handleDropCard's comment (near the top of the file) on why this
+          // goes through the queue instead of calling startManagerDraw directly.
+          pendingManagerDealsRef.current.push(id)
+          runManagerDealQueue(maybeCompleteInitialDeal)
+        },
+        300 + 550 + 450,
+      ),
+    )
+  }
+
+  // When the manager leads (see `leader`), it opens the round by playing a card into
+  // the top slot; the player only gets to respond once it's landed (see
+  // handleDropCard). When the player leads instead, this just no-ops and waits — see
+  // the next effect for the manager's side of that case.
   useEffect(() => {
-    if (!gameStarted || !dealt || gameOver) return
+    if (!gameStarted || !dealt || gameOver || leader !== 'manager') return
 
     timers.current.forEach((t) => clearTimeout(t))
     timers.current = []
     setFlight(null)
 
-    timers.current.push(
-      window.setTimeout(() => {
-        const hasEligiblePlayerRecurringTarget = (category: string) =>
-          activeRecurringEffects.current.some((e) => !e.stopped && e.side === 'player' && e.category === category)
-
-        // A 'block recurring' card carries no stat deltas of its own (see the damage
-        // heuristic below), so without this it would always score 0 and lose out to
-        // almost anything else in hand. It's only worth playing when there's an
-        // active, not-already-suspended player recurring effect it would actually
-        // suspend — matching `target`, or any type for '*'.
-        const hasEligibleBlockTarget = (c: ManagerCard) => {
-          if (c.effect !== 'block recurring') return false
-          return activeRecurringEffects.current.some(
-            (e) =>
-              !e.stopped &&
-              e.side === 'player' &&
-              !((e.suspendedTurnsRemaining ?? 0) > 0) &&
-              (c.target === '*' || e.category === c.target),
-          )
-        }
-
-        const handEntries = managerHand
-          .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
-          .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
-          .filter((entry) => !isCardLocked(entry.card, 'manager'))
-        if (handEntries.length === 0) return
-
-        // Normalized (percent-of-max) estimate of how much playing this card would
-        // hurt the player — the higher, the more damaging. '*' and 'reset' clear a
-        // stat to 0, which only helps the player, so they're scored as improving
-        // (negative) that stat rather than raising it.
-        const damage = (c: ManagerCard) => {
-          const backlogDelta = c.action === 'reset' || c.backlog === '*' ? -backlog : (c.backlog ?? 0)
-          const techDebtDelta =
-            c.action === 'reset' || c.techDebt === '*' ? -techDebt : (c.techDebt ?? 0)
-          return (
-            backlogDelta / STAT_MAX +
-            techDebtDelta / STAT_MAX +
-            (c.burnout ?? 0) / BURNOUT_MAX -
-            (c.vesting ?? 0) / VESTING_MAX
-          )
-        }
-
-        // An eliminate card with something in hand eligible to eliminate takes
-        // priority over raw damage — shutting down an active player recurring card
-        // outweighs a one-off stat hit — and otherwise the manager plays whatever in
-        // hand would hurt the player most. A block-recurring card with something
-        // eligible to suspend gets the same priority treatment, one tier below
-        // eliminate (permanently stopping a recurring card beats temporarily pausing
-        // one, when both are available).
-        const eligibleEliminate = handEntries.filter(
-          (e) => e.card.action === 'eliminate' && hasEligiblePlayerRecurringTarget(e.card.category),
-        )
-        const eligibleBlock = handEntries.filter((e) => hasEligibleBlockTarget(e.card))
-        const pool =
-          eligibleEliminate.length > 0 ? eligibleEliminate : eligibleBlock.length > 0 ? eligibleBlock : handEntries
-        const chosen = pool.reduce((best, e) => (damage(e.card) > damage(best.card) ? e : best))
-        const { card, id } = chosen
-
-        const sourceEl = managerHandRef.current?.querySelector(`[data-card-id="${id}"]`)
-        const destEl = activeSlotRef.current
-        if (!sourceEl || !destEl) return
-
-        const s = sourceEl.getBoundingClientRect()
-        const d = destEl.getBoundingClientRect()
-
-        setHiddenHandId(id)
-        setFlight({
-          key: ++flightKeyCounter.current,
-          card,
-          source: { top: s.top, left: s.left, width: s.width, height: s.height },
-          dest: { top: d.top, left: d.left, width: d.width, height: d.height },
-          flipped: false,
-          arrived: false,
-        })
-
-        timers.current.push(
-          window.setTimeout(() => {
-            setFlight((f) => (f ? { ...f, flipped: true } : f))
-            playSound('mc-action-flip-card')
-          }, 300),
-        )
-
-        timers.current.push(
-          window.setTimeout(() => setFlight((f) => (f ? { ...f, arrived: true } : f)), 300 + 550),
-        )
-
-        timers.current.push(
-          window.setTimeout(
-            () => {
-              setActiveManagerCard(card)
-              managerDiscard.current.push(card)
-              setManagerHand((prev) => prev.map((c, i) => (MANAGER_SLOT_IDS[i] === id ? null : c)))
-              setUsedManagerIds((prev) => new Set(prev).add(id))
-              setHiddenHandId(null)
-              setFlight(null)
-              // See handleDropCard's comment (near the top of the file) on why this
-              // goes through the queue instead of calling startManagerDraw directly.
-              pendingManagerDealsRef.current.push(id)
-              runManagerDealQueue(maybeCompleteInitialDeal)
-            },
-            300 + 550 + 450,
-          ),
-        )
-      }, 500),
-    )
+    timers.current.push(window.setTimeout(autoPlayManagerCard, 500))
 
     return () => {
       timers.current.forEach((t) => clearTimeout(t))
       timers.current = []
     }
-    // managerHand/backlog/techDebt/usedManagerIds are deliberately read via
-    // closure rather than listed here — this effect should only re-fire on an actual
-    // new round, each time picking up whatever those are at that moment (always
+    // managerHand/backlog/techDebt/usedManagerIds/blurTurnsRemaining are deliberately
+    // read via closure rather than listed here — this effect should only re-fire on an
+    // actual new round, each time picking up whatever those are at that moment (always
     // settled by then: the previous round's slot refill finishes well before the next
     // round starts).
-  }, [roundKey, gameStarted, dealt, gameOver])
+  }, [roundKey, gameStarted, dealt, gameOver, leader])
+
+  // Mirrors the round-start effect above for a player-led round: once the player's
+  // card lands in the (otherwise empty) active slot — see handleDropCard's `leading`
+  // case — the manager auto-plays its response the same way it always opens a
+  // manager-led round, just triggered by the player's card instead of by roundKey.
+  useEffect(() => {
+    if (!gameStarted || !dealt || gameOver || leader !== 'player') return
+    if (!activePlayerCard || activeManagerCard) return
+
+    timers.current.push(window.setTimeout(autoPlayManagerCard, 500))
+
+    return () => {
+      timers.current.forEach((t) => clearTimeout(t))
+      timers.current = []
+    }
+  }, [activePlayerCard, activeManagerCard, leader, gameStarted, dealt, gameOver])
 
   // Once the player responds to the manager's card, resolve the round after the
   // sparkle-burst animation plays out.
@@ -1420,11 +1502,11 @@ function GameBoard() {
       // A 'reset' card wipes backlog and/or technical debt to 0 outright — reuses the
       // same '*' clearable-delta sentinel applyClearableDelta already honors for
       // per-card wildcard values, so it overrides every other contributing delta that
-      // round regardless of side. Its `target` narrows this to a single stat ('techDebt'
-      // or 'backlog'); omitting `target` clears both, same as before targeted resets
-      // existed.
+      // round regardless of side. A `{ kind: 'stat' }` target narrows this to a single
+      // stat ('techDebt' or 'backlog'); omitting `target` clears both, same as before
+      // targeted resets existed.
       const resetTargets = (card: PlayerCard | ManagerCard) =>
-        card.action === 'reset' ? (card.target ?? null) : undefined
+        card.action === 'reset' ? (card.target?.kind === 'stat' ? card.target.stat : null) : undefined
       const playerResetTarget = resetTargets(activePlayerCard)
       const managerResetTarget = !reversed && !cancelled ? resetTargets(activeManagerCard) : undefined
       const resetSentinelFor = (stat: 'backlog' | 'techDebt'): '*' | undefined =>
@@ -1438,36 +1520,49 @@ function GameBoard() {
       // stop compounding from here on, and the battle history round it came from gets
       // flagged so it renders the STOPPED overlay. Works both ways: a player eliminate
       // card targets the manager's recurring cards, and vice versa.
-      // An 'eliminate' + target:'character' card instead un-reveals the most recent
-      // still-standing 'character'-action card on the opposing side, while
-      // target:'character:{name}' un-reveals that specific character's card wherever
-      // it sits in the play order — re-locking any 'coding' card naming it
-      // (isCardLocked reads revealedCharacters live, so removing it here is all that's
-      // needed), lifts every suspension that character's own 'block recurring' effect
-      // caused (by matching on `suspendedBy` rather than category, so it can't disturb
-      // a block some other card caused), AND stops every still-active recurring effect
-      // on that side attributed to that same character (RecurringEffect.character) —
-      // both that character's card and every recurring card tied to them get flagged
-      // for the ELIMINATED overlay, distinct from the plain STOPPED one above.
-      const findEliminatedCharacterRoundIds = (targetSide: 'player' | 'manager', characterName?: string) => {
+      // An 'eliminate' card with a `{ kind: 'character' }` target instead un-reveals
+      // still-standing 'character'-action card(s) on the opposing side: selector
+      // 'last' takes the most recently played one, 'named' takes the one matching
+      // `name` (case-insensitive) wherever it sits in the play order, and 'all' takes
+      // every still-standing one — re-locking any 'coding' card naming them
+      // (isCardLocked reads revealedCharacters live, so removing them here is all
+      // that's needed), lifting every suspension each character's own 'block
+      // recurring' effect caused (by matching on `suspendedBy` rather than category,
+      // so it can't disturb a block some other card caused), AND stopping every
+      // still-active recurring effect on that side attributed to that character
+      // (RecurringEffect.character) — both the character's own card and every
+      // recurring card tied to them get flagged for the ELIMINATED overlay, distinct
+      // from the plain STOPPED one above.
+      const findEliminatedCharacterRoundIds = (
+        targetSide: 'player' | 'manager',
+        target: Extract<CardTarget, { kind: 'character' }>,
+      ) => {
         const plays = characterPlays.current[targetSide]
-        const index = characterName
-          ? plays.findLastIndex((p) => p.character.toLowerCase() === characterName.toLowerCase())
-          : plays.length - 1
-        if (index < 0) return []
-        const [match] = plays.splice(index, 1)
-        revealedCharacters.current[targetSide].delete(match.character)
-        const roundIds = [match.roundId]
-        activeRecurringEffects.current.forEach((effect) => {
-          if (effect.suspendedBy === match.roundId) effect.suspendedTurnsRemaining = 0
-          if (
-            !effect.stopped &&
-            effect.side === targetSide &&
-            effect.character?.toLowerCase() === match.character.toLowerCase()
-          ) {
-            effect.stopped = true
-            roundIds.push(effect.roundId)
-          }
+        const matches =
+          target.selector === 'all'
+            ? plays.splice(0, plays.length)
+            : (() => {
+                const index =
+                  target.selector === 'last'
+                    ? plays.length - 1
+                    : plays.findLastIndex((p) => p.character.toLowerCase() === target.name.toLowerCase())
+                return index < 0 ? [] : plays.splice(index, 1)
+              })()
+        const roundIds: string[] = []
+        matches.forEach((match) => {
+          revealedCharacters.current[targetSide].delete(match.character)
+          roundIds.push(match.roundId)
+          activeRecurringEffects.current.forEach((effect) => {
+            if (effect.suspendedBy === match.roundId) effect.suspendedTurnsRemaining = 0
+            if (
+              !effect.stopped &&
+              effect.side === targetSide &&
+              effect.character?.toLowerCase() === match.character.toLowerCase()
+            ) {
+              effect.stopped = true
+              roundIds.push(effect.roundId)
+            }
+          })
         })
         return roundIds
       }
@@ -1476,14 +1571,8 @@ function GameBoard() {
         targetSide: 'player' | 'manager',
       ): { roundIds: string[]; eliminated: boolean } => {
         if (eliminatingCard.action !== 'eliminate') return { roundIds: [], eliminated: false }
-        if (eliminatingCard.target === 'character') {
-          return { roundIds: findEliminatedCharacterRoundIds(targetSide), eliminated: true }
-        }
-        if (eliminatingCard.target?.startsWith('character:')) {
-          return {
-            roundIds: findEliminatedCharacterRoundIds(targetSide, eliminatingCard.target.slice('character:'.length)),
-            eliminated: true,
-          }
+        if (eliminatingCard.target?.kind === 'character') {
+          return { roundIds: findEliminatedCharacterRoundIds(targetSide, eliminatingCard.target), eliminated: true }
         }
         for (let i = activeRecurringEffects.current.length - 1; i >= 0; i--) {
           const effect = activeRecurringEffects.current[i]
@@ -1502,22 +1591,23 @@ function GameBoard() {
         : findEliminatedRoundIds(activeManagerCard, 'player')
 
       // A 'block recurring' card suspends every still-active OPPOSING-side recurring
-      // effect matching `target` (or every type, for '*') for `duration` turns —
-      // searched before this round's own recurring cards are registered below, so a
-      // recurring card played this same round can never be suspended by a block
-      // played alongside it. A neutralized manager card (cancelled or reversed away)
-      // never took effect, so it can't suspend anything either.
+      // effect matching its `{ kind: 'category' }` target (or every category, for
+      // '*') for `duration` turns — searched before this round's own recurring cards
+      // are registered below, so a recurring card played this same round can never be
+      // suspended by a block played alongside it. A neutralized manager card
+      // (cancelled or reversed away) never took effect, so it can't suspend anything
+      // either.
       const applyBlockRecurring = (
         card: PlayerCard | ManagerCard,
         side: 'player' | 'manager',
         neutralized: boolean,
       ) => {
-        if (neutralized || card.effect !== 'block recurring') return
+        if (neutralized || card.effect !== 'block recurring' || card.target?.kind !== 'category') return
         const targetSide = side === 'player' ? 'manager' : 'player'
         for (const effect of activeRecurringEffects.current) {
           if (effect.stopped) continue
           if (effect.side !== targetSide) continue
-          if (card.target !== '*' && effect.category !== card.target) continue
+          if (card.target.category !== '*' && effect.category !== card.target.category) continue
           // No `duration` means this block lasts the rest of the game rather than
           // ticking down — see the RecurringEffect.suspendedTurnsRemaining comment.
           effect.suspendedTurnsRemaining = card.duration ?? Infinity
@@ -1526,6 +1616,19 @@ function GameBoard() {
       }
       applyBlockRecurring(activePlayerCard, 'player', false)
       applyBlockRecurring(activeManagerCard, 'manager', cancelled || reversed)
+
+      // A manager 'blur' card obscures the player's hand and the shared dropzone/
+      // history for `duration` turns (see Card.tsx's blurred prop) — refreshes the
+      // countdown to the new card's duration rather than stacking with whatever was
+      // already running. A neutralized manager card (cancelled or reversed away)
+      // never took effect, so it can't start (or refresh) a blur; otherwise the
+      // existing countdown just ticks down by one, same idea as the suspension
+      // countdown below.
+      if (activeManagerCard.action === 'blur' && !cancelled && !reversed) {
+        setBlurTurnsRemaining(activeManagerCard.duration ?? Infinity)
+      } else {
+        setBlurTurnsRemaining((prev) => Math.max(0, prev - 1))
+      }
 
       // Snapshot of every still-suspended effect's remaining turns, keyed by the round
       // it was originally played in, for the SUSPENDED overlay below and for excluding
@@ -1743,6 +1846,8 @@ function GameBoard() {
           // roundKey-gated round-start effect), so the player never sees a new card fly
           // in while the previous round's stats are still catching up.
           setRoundKey((k) => k + 1)
+          // Whoever led this round, the other side leads the next one.
+          setLeader((prev) => (prev === 'manager' ? 'player' : 'manager'))
 
           // Once per round, a random still-unused flavor message (or whole
           // conversation) posts to its channel and nudges the meters same as a played
@@ -1821,7 +1926,7 @@ function GameBoard() {
       <div className="top-bar-manager">
         <div className="side-row">
           <div className="deck-wrap" ref={managerDeckRef}>
-            <Deck image="/cards/pc-manager-back-image.webp" count={30} />
+            <Deck image="/cards/mc-manager-back-image.webp" count={30} />
           </div>
           <div className="manager-hand-wrap" ref={managerHandRef}>
             <ManagerHand
@@ -1857,7 +1962,9 @@ function GameBoard() {
         history={history}
         activePlayerCard={activePlayerCard}
         activeManagerCard={activeManagerCard}
+        leader={leader}
         lockMessage={lockMessage}
+        blurredTurns={blurTurnsRemaining}
       />
       <SlackPanel
         channels={CHANNEL_ORDER}
@@ -1877,6 +1984,7 @@ function GameBoard() {
               draggingCardId={draggingCard?.id ?? null}
               lockedCardIds={lockedCardIds}
               onCardPointerDown={handleCardPointerDown}
+              blurredTurns={blurTurnsRemaining}
             />
           </div>
         </div>
@@ -1897,7 +2005,7 @@ function GameBoard() {
             height: dragInfo.current.height,
           }}
         >
-          <Card card={draggingCard} forceExpanded />
+          <Card card={draggingCard} forceExpanded blurredTurns={blurTurnsRemaining} />
         </div>
       )}
 
@@ -1915,10 +2023,10 @@ function GameBoard() {
           <div className={`flip-card ${flight.flipped ? 'flip-card-flipped' : ''}`}>
             <div className="flip-card-inner">
               <div className="flip-face flip-face-front">
-                <img src="/cards/pc-manager-back-image.webp" alt="" draggable={false} />
+                <img src="/cards/mc-manager-back-image.webp" alt="" draggable={false} />
               </div>
               <div className="flip-face flip-face-back">
-                <Card card={flight.card} />
+                <Card card={flight.card} blurredTurns={blurTurnsRemaining} />
               </div>
             </div>
           </div>
@@ -1942,7 +2050,7 @@ function GameBoard() {
                 <img src="/cards/pc-player-back-image.webp" alt="" draggable={false} />
               </div>
               <div className="flip-face flip-face-back">
-                <Card card={playerFlight.card} />
+                <Card card={playerFlight.card} blurredTurns={blurTurnsRemaining} />
               </div>
             </div>
           </div>
@@ -1967,7 +2075,7 @@ function GameBoard() {
             transitionDuration: `${managerDrawFlight.durationMs}ms`,
           }}
         >
-          <img className="card-flight-back" src="/cards/pc-manager-back-image.webp" alt="" draggable={false} />
+          <img className="card-flight-back" src="/cards/mc-manager-back-image.webp" alt="" draggable={false} />
         </div>
       )}
     </div>

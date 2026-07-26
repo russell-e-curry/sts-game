@@ -16,16 +16,18 @@ interface CardProps<T extends GameCard> {
   played?: boolean
   /** True once an 'eliminate' card of the same type has stopped this recurring card — renders a striped overlay and suppresses the recurring glow. */
   stopped?: boolean
-  /** True once an 'eliminate' + target:'character' (or target:'character:{name}') card has taken this card down — either it's the character card itself or a recurring card attributed to that character. Renders the ELIMINATED overlay instead of `stopped`'s STOPPED one. */
+  /** True once an 'eliminate' card with a `{ kind: 'character' }` target has taken this card down — either it's the character card itself or a recurring card attributed to that character. Renders the ELIMINATED overlay instead of `stopped`'s STOPPED one. */
   eliminated?: boolean
   /** True once a 'cancel' card played the same round has neutralized this card — renders a striped overlay, same idea as `stopped` but from a same-round cancel rather than a later-round eliminate. */
   cancelled?: boolean
   /** Turns left that a 'block recurring' card has suspended this recurring card for — renders a striped overlay (and the countdown) and pauses the recurring glow, same idea as `stopped` but temporary rather than permanent. Undefined/0 means not suspended. */
   suspendedTurns?: number
+  /** Turns left that a manager 'blur' card has this card's face out of focus for — renders it unreadable (without hiding its position/shape) plus a "HUNG OVER" overlay counting down the same duration, same idea as `suspendedTurns` but board-wide rather than tied to one recurring effect. Undefined/0 means not blurred. Doesn't affect interaction (dragging/playing still works). */
+  blurredTurns?: number
   onPointerDown?: (e: PointerEvent, card: T) => void
 }
 
-// Display labels for a targeted 'reset' card's `target` stat (see CardBase.target).
+// Display labels for a targeted 'reset' card's `target.stat` (see CardBase.target).
 const RESET_TARGET_LABELS: Record<string, string> = {
   techDebt: 'Tech Debt',
   backlog: 'Backlog',
@@ -59,9 +61,11 @@ function Card<T extends GameCard>({
   eliminated,
   cancelled,
   suspendedTurns,
+  blurredTurns,
   onPointerDown,
 }: CardProps<T>) {
   const suspended = !!suspendedTurns && suspendedTurns > 0
+  const blurred = !!blurredTurns && blurredTurns > 0
   const [hovered, setHovered] = useState(false)
   const [clicked, setClicked] = useState(false)
   const [artFailed, setArtFailed] = useState(false)
@@ -169,26 +173,32 @@ function Card<T extends GameCard>({
       }
     : {}
 
-  const actionTemplateClass =
-    card.action === 'recurring'
+  // Face color reads off the cosmetic `type` label, not the actual `action` — lets a
+  // card style itself as e.g. a character card while mechanically doing something
+  // else (see pc-mgmt-char-qa-lead.json, type 'character' + action 'recurring', which
+  // should still get the gold character face). Case-insensitive since `type` is
+  // freeform content-authored text, not a strict enum like `action`.
+  const cardType = card.type.toLowerCase()
+  const typeTemplateClass =
+    cardType === 'recurring'
       ? ' game-card-template-recurring'
-      : card.action === 'eliminate'
+      : cardType === 'eliminate'
         ? ' game-card-template-eliminate'
-        : card.action === 'character' && card.character
+        : cardType === 'character'
           ? ' game-card-template-character'
           : ''
 
   return (
     <div
       ref={rootRef}
-      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !eliminated && !cancelled && !suspended ? ' game-card-recurring' : ''}`}
+      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !eliminated && !cancelled && !suspended ? ' game-card-recurring' : ''}${blurred ? ' game-card-blurred' : ''}`}
       style={style}
       onPointerDown={onPointerDown ? (e) => onPointerDown(e, card) : undefined}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
     >
-      <div className={`game-card-template${actionTemplateClass}`}>
+      <div className={`game-card-template${typeTemplateClass}`}>
         <div className="game-card-header">
           <span className="game-card-category">{card.category}</span>
           <span className="game-card-action">{card.type}</span>
@@ -212,38 +222,31 @@ function Card<T extends GameCard>({
             {card.description}
           </p>
         </div>
-        {card.action !== 'reset' && card.action !== 'cancel' && (
+        {card.action !== 'reset' && card.action !== 'cancel' && card.action !== 'blur' && (
           <div className="game-card-footer">
             {card.action === 'reversal' ? (
-              <span className="game-card-stat game-card-stat-slot-center game-card-stat-color-vesting">
-                Reverse manager's card
-              </span>
+              <span className="game-card-stat game-card-stat-color-vesting">Reverse manager's card</span>
             ) : (
               <>
-                {card.backlog !== undefined ? (
+                {card.backlog !== undefined && (
                   <span
-                    className={`game-card-stat game-card-stat-slot-left ${card.backlog === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-backlog'}`}
+                    className={`game-card-stat ${card.backlog === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-backlog'}`}
                   >
                     Backlog {card.backlog === '*' ? 'Reset' : card.backlog}
                   </span>
-                ) : card.techDebt !== undefined ? (
+                )}
+                {card.techDebt !== undefined && (
                   <span
-                    className={`game-card-stat game-card-stat-slot-left ${card.techDebt === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-techdebt'}`}
+                    className={`game-card-stat ${card.techDebt === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-techdebt'}`}
                   >
                     Tech Debt {card.techDebt === '*' ? 'Reset' : card.techDebt}
                   </span>
-                ) : card.vesting !== undefined && card.burnout !== undefined ? (
-                  <span className="game-card-stat game-card-stat-slot-left game-card-stat-color-vesting">
-                    Vesting {card.vesting}
-                  </span>
-                ) : null}
-                {card.vesting !== undefined && card.burnout === undefined && (
-                  <span className="game-card-stat game-card-stat-slot-center game-card-stat-color-vesting">
-                    Vesting {card.vesting}
-                  </span>
+                )}
+                {card.vesting !== undefined && (
+                  <span className="game-card-stat game-card-stat-color-vesting">Vesting {card.vesting}</span>
                 )}
                 {card.burnout !== undefined && (
-                  <span className="game-card-stat game-card-stat-slot-right game-card-stat-color-burnout">
+                  <span className="game-card-stat game-card-stat-color-burnout">
                     {card.burnout > 0 ? `+${card.burnout}` : card.burnout}
                   </span>
                 )}
@@ -253,25 +256,32 @@ function Card<T extends GameCard>({
         )}
         {card.action === 'eliminate' && (
           <div className="game-card-eliminate-badge">
-            {card.target === 'character'
-              ? 'Eliminate a Character'
-              : card.target?.startsWith('character:')
-                ? `Eliminate ${card.target.slice('character:'.length).toUpperCase()}`
-                : card.character
-                  ? `Eliminate the ${card.character}`
-                  : 'Stop a Recurring Card'}
+            {card.target?.kind === 'character'
+              ? card.target.selector === 'last'
+                ? 'Eliminate a Character'
+                : card.target.selector === 'all'
+                  ? 'Eliminate All Characters'
+                  : `Eliminate ${card.target.name.toUpperCase()}`
+              : card.character
+                ? `Eliminate the ${card.character}`
+                : 'Stop a Recurring Card'}
           </div>
         )}
         {card.action === 'reset' &&
-          (card.target ? (
+          (card.target?.kind === 'stat' ? (
             <div className="game-card-reset-target-badge">
-              Reset {RESET_TARGET_LABELS[card.target] ?? card.target}
+              Reset {RESET_TARGET_LABELS[card.target.stat] ?? card.target.stat}
             </div>
           ) : (
             <div className="game-card-reset-badge">Reset Tech Debt & Backlog</div>
           ))}
         {card.action === 'cancel' && (
           <div className="game-card-cancel-badge">Cancel Manager's Card</div>
+        )}
+        {card.action === 'blur' && (
+          <div className="game-card-blur-badge">
+            Blurry Vision{card.duration ? ` (${card.duration} Turn${card.duration === 1 ? '' : 's'})` : ''}
+          </div>
         )}
       </div>
       {eliminated ? (
@@ -295,6 +305,14 @@ function Card<T extends GameCard>({
           <span className="game-card-suspended-label">SUSPENDED</span>
           <span className="game-card-suspended-turns">
             {Number.isFinite(suspendedTurns) ? `${suspendedTurns} turn${suspendedTurns === 1 ? '' : 's'} left` : 'Rest of the game'}
+          </span>
+        </div>
+      )}
+      {blurred && (
+        <div className="game-card-blurred-overlay">
+          <span className="game-card-blurred-label">HUNG OVER</span>
+          <span className="game-card-blurred-turns">
+            {Number.isFinite(blurredTurns) ? `${blurredTurns} turn${blurredTurns === 1 ? '' : 's'} left` : 'Rest of the game'}
           </span>
         </div>
       )}

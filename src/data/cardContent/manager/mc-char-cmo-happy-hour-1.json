@@ -1,0 +1,10 @@
+{
+  "title": "Happy Hour",
+  "category": "meetings",
+  "type" : "recurring",
+  "character" : "cmo",
+  "description": "The Chief Marketing Officer invites you out for some drinks, and some drinks. Your vision is blurred for the next two rounds.",
+  "action" : "blur",
+  "duration" : 2
+
+}

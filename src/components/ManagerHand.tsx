@@ -15,7 +15,7 @@ function ManagerHand({ ids, usedIds, hiddenId }: ManagerHandProps) {
             <img
               data-card-id={id}
               className={`manager-hand-card${id === hiddenId ? ' manager-hand-card-hidden' : ''}`}
-              src="/cards/pc-manager-back-image.webp"
+              src="/cards/mc-manager-back-image.webp"
               alt="Manager's hidden card"
               draggable={false}
             />

@@ -10,10 +10,12 @@ interface HandProps {
    * card hasn't landed on the player's side (see GameBoard's isCardLocked). Rendered
    * dimmer than a normal card so the player can see why before even trying to play it. */
   lockedCardIds?: Set<string>
+  /** Turns left that a manager 'blur' card's effect is active for — see Card's `blurredTurns` prop. */
+  blurredTurns?: number
   onCardPointerDown?: (e: PointerEvent, card: PlayerCard) => void
 }
 
-function Hand({ cards, draggingCardId, lockedCardIds, onCardPointerDown }: HandProps) {
+function Hand({ cards, draggingCardId, lockedCardIds, blurredTurns, onCardPointerDown }: HandProps) {
   return (
     <div className="hand">
       {cards.map((card, i) => (
@@ -23,6 +25,7 @@ function Hand({ cards, draggingCardId, lockedCardIds, onCardPointerDown }: HandP
               card={card}
               dimmed={card.id === draggingCardId}
               locked={lockedCardIds?.has(card.id)}
+              blurredTurns={blurredTurns}
               onPointerDown={onCardPointerDown}
               expandOnClick
             />

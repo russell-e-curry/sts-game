@@ -2,6 +2,7 @@
   "title": "Radical Acceptance",
   "category": "wellness",
   "action": "one time",
+  "playableAgainst": ["*"],
   "description": "It is what it is, at least you're getting paid.",
   "burnout": -25
 }

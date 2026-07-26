@@ -1,10 +1,10 @@
 {
-  "title": "Chief Financial Officer",
-  "category": "management",
+  "title": "CFO",
+  "category": "Management",
+  "type" : "Character",
   "action": "character",
   "character" : "CFO",
-  "description": "The CFO stops all work for an audit, your recurring cards are blocked for 3 turns.",
-  "effect" : "block recurring",
-  "target" : "*",
-  "duration" : 3
+  "description": "The boss brings in the CFO to cut expenses.",
+  "effect" : "recurring",
+  "burnout" : 15
 }

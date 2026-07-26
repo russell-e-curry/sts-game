@@ -2,6 +2,7 @@
   "title": "Sick Day",
   "category": "wellness",
   "action": "one time",
+  "playableAgainst": ["*"],
   "description": "The doctor says you should drink more beer, also, you'll be calling yourself \"The Doctor\" from now on.",
   "burnout": -25
 }
