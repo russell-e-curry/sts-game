@@ -1973,6 +1973,7 @@ function GameBoard() {
           activeChannel={activeSlackChannel}
           onSelectChannel={setActiveSlackChannel}
           messages={slackMessages}
+          compact={visibleHandCards < HAND_SIZE}
         />
       </div>
 

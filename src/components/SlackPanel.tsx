@@ -23,6 +23,11 @@ interface SlackPanelProps {
   activeChannel: string
   onSelectChannel: (channel: string) => void
   messages: PostedSlackMessage[]
+  /** Hides the channel-list sidebar, leaving just the header's "#channel" name to
+   * identify which channel is showing — used once the window's gotten too narrow to
+   * fit the full hand of cards (see GameBoard's visibleHandCards), so the sidebar's
+   * width goes back to the messages instead of squeezing them further. */
+  compact?: boolean
 }
 
 function initialsFor(character: string) {
@@ -67,7 +72,7 @@ function SlackAvatar({ character }: { character: string }) {
   )
 }
 
-function SlackPanel({ channels, activeChannel, onSelectChannel, messages }: SlackPanelProps) {
+function SlackPanel({ channels, activeChannel, onSelectChannel, messages, compact }: SlackPanelProps) {
   // Newest last (chronological) in the array, but rendered oldest-last so the
   // column-reverse flex flow (see SlackPanel.css) keeps the view pinned to the
   // newest message without any manual scroll-to-bottom logic.
@@ -75,23 +80,25 @@ function SlackPanel({ channels, activeChannel, onSelectChannel, messages }: Slac
 
   return (
     <div className="slack-panel">
-      <div className="slack-sidebar">
-        <div className="slack-workspace-name">Widget Corp</div>
-        <div className="slack-channel-list">
-          {channels.map((channel) => (
-            <div
-              key={channel}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectChannel(channel)}
-              className={`slack-channel${channel === activeChannel ? ' slack-channel-active' : ''}`}
-            >
-              <span className="slack-channel-hash">#</span>
-              {channel.toLowerCase()}
-            </div>
-          ))}
+      {!compact && (
+        <div className="slack-sidebar">
+          <div className="slack-workspace-name">Widget Corp</div>
+          <div className="slack-channel-list">
+            {channels.map((channel) => (
+              <div
+                key={channel}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectChannel(channel)}
+                className={`slack-channel${channel === activeChannel ? ' slack-channel-active' : ''}`}
+              >
+                <span className="slack-channel-hash">#</span>
+                {channel.toLowerCase()}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="slack-main">
         <div className="slack-header">
