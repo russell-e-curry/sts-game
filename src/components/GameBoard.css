@@ -1,40 +1,47 @@
-/* Three grid columns — manager hand / history / player hand (column 1), the dropzone
-   + discard slot (column 2, auto-sized to fit a single card), and meters / Slack /
-   copyright (column 3, taking whatever's left). Putting the manager hand, history,
-   and player hand in the same column (and the meters/Slack/copyright likewise) lets
-   them share width without any cross-row pinning, unlike the old three-stacked-
-   flex-rows layout this replaced.
+/* Three full-width horizontal bands — .row-top (manager hand + meters), .row-middle
+   (battle history + dropzone + Slack), .row-bottom (player hand + discard) — stacked
+   in a plain flex column rather than a CSS Grid: nothing needs to align across rows
+   any more (each row sizes its own children independently), so there's no need for
+   Grid's shared column tracks.
 
-   Column 1's width AND all three row heights below are fallbacks only, overridden by
-   GameBoard.tsx's column1Width/rowHeights (see their comments): column 1's cells
-   size themselves via aspect-ratio from their row's height, and letting either the
-   column stay `auto` or the rows stay `fr` lets the two dimensions feed back into
-   each other (confirmed directly in devtools — column width blowing up to thousands
-   of px, and separately, row 1 and row 3 resolving to visibly different heights even
-   though both only ever need to fit one card, because row 3 has a second card-shaped
-   element in it that row 1 doesn't — see .discard-column in BattleArea.css).
-   Computing both in JS from a single shared card-size formula sidesteps that
-   entirely; this `auto`/`1fr 2fr 1fr` only matters for the first frame or two before
-   that computation lands. */
-/* Row gap and outer padding are both 20px (matching the column gap) so the manager's
-   cards get the same breathing room above the history area as the player's cards get
-   below them, above the screen's bottom edge — see BOARD_ROW_GAP/BOARD_PADDING in
-   GameBoard.tsx, which this must stay in sync with. */
+   Each row's height below is a fallback only, overridden by GameBoard.tsx's
+   rowHeights (see its comment) with an explicit pixel value computed from the same
+   card-size formula every row's cards use — necessary because a row's actual content
+   (e.g. row-middle's two stacked cards vs row-top/row-bottom's one) needs different
+   chrome accounted for around it, so a plain flex-grow ratio can't reliably keep them
+   all fitting exactly one/two card(s) tall. */
+/* Row gap and outer padding are both 20px (matching the gap between elements within a
+   row) so the manager's cards get the same breathing room above the battle area as
+   the player's cards get below them, above the screen's bottom edge — see
+   BOARD_ROW_GAP/BOARD_PADDING in GameBoard.tsx, which this must stay in sync with. */
 .game-board {
-  display: grid;
-  grid-template-columns: auto auto minmax(200px, 1fr);
-  grid-template-rows: 1fr 2fr 1fr;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   box-sizing: border-box;
   gap: 20px;
   padding: 20px;
 }
 
+/* align-items left at its default (stretch) on all three — .top-bar-manager, .hud,
+   .bottom-bar, and .history-panel all rely on being stretched to their row's full
+   height (mirroring every cell's default stretch under the old CSS Grid). Elements
+   that shouldn't stretch (.active-column, .discard-column — see BattleArea.css) set
+   an explicit height of their own instead, which overrides stretch without needing
+   an align-self here. */
+.row-top,
+.row-middle,
+.row-bottom {
+  display: flex;
+  min-height: 0;
+  gap: 20px;
+}
+
 .game-credit {
-  grid-column: 3;
-  grid-row: 3;
-  align-self: end;
-  justify-self: end;
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
   text-align: right;
   pointer-events: none;
   color: #fff;
@@ -53,14 +60,13 @@
 
 /* align-items: flex-start (rather than the flex default, stretch) on both of these —
    .side-row below is flex: 1, and a stretched flex: 1 child's max-content
-   contribution is what column 1's grid auto-sizing (see .game-board) measures to
-   size this whole column. Left at the stretch default, that combination made
-   browsers report a wildly inflated max-content width (thousands of px, not the
-   ~1200px the deck+hand actually need) — found by comparing .side-row's measured
-   width with align-items: stretch vs flex-start directly in devtools. */
-.top-bar-manager {
-  grid-column: 1;
-  grid-row: 1;
+   contribution is what its flex row's auto-sizing measures to size this box. Left at
+   the stretch default, that combination made browsers report a wildly inflated
+   max-content width (thousands of px, not the ~1200px the deck+hand actually need) —
+   found by comparing .side-row's measured width with align-items: stretch vs
+   flex-start directly in devtools. */
+.top-bar-manager,
+.bottom-bar {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -71,42 +77,35 @@
 /* padding-bottom gives the player's hand slots (dashed outlines included) some extra
    clearance from the bottom of the screen beyond .game-board's own padding — see
    BOTTOM_BAR_PADDING in GameBoard.tsx, which this must stay in sync with (it grows
-   row 3's own height to make room, rather than shrinking the cards to fit). */
+   .row-bottom's own height to make room, rather than shrinking the cards to fit). */
 .bottom-bar {
-  grid-column: 1;
-  grid-row: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 0;
-  min-height: 0;
   padding-bottom: 16px;
   box-sizing: border-box;
 }
 
-/* .history-panel, .active-column, and .discard-column are defined in BattleArea.css
-   (their own internal padding/border/flex treatment lives there) — this is just
-   where they land in the board's grid. .active-column lines up with the history
-   row, .discard-column with the player-hand row directly below it. */
+/* .history-panel and .active-column are defined in BattleArea.css (their own
+   internal padding/border/flex treatment lives there) — this is just how they share
+   .row-middle's width with the Slack panel. .active-column doesn't grow (see its own
+   flex-basis: auto in BattleArea.css), so the width left over after it splits evenly
+   between .history-panel and .slack-panel: both flex: 1 1 0 (flex-basis: 0, not
+   auto) so their own natural content size — hugely different between an empty-ish
+   history strip and Slack's chat log — plays no part in the split, and both grow/
+   shrink together as the window resizes, keeping the dropzone visually centered
+   between them. min-width matches .slack-panel's below, just enough to stay legible
+   rather than getting squeezed to nothing on a narrow window. */
 .history-panel {
-  grid-column: 1;
-  grid-row: 2;
+  flex: 1 1 0;
+  min-width: 260px;
 }
 
-.active-column {
-  grid-column: 2;
-  grid-row: 2;
-}
+/* .discard-column is defined in BattleArea.css — placed here in .row-bottom,
+   directly after the player's hand. */
 
-.discard-column {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-/* Defined in SlackPanel.css — just placed here. */
+/* Defined in SlackPanel.css — see .history-panel's comment above; the two split
+   .row-middle's leftover width evenly and in step with each other. */
 .slack-panel {
-  grid-column: 3;
-  grid-row: 2;
+  flex: 1 1 0;
+  min-width: 260px;
 }
 
 /* Fills its row (there's no label above it any more); its card rows size themselves
@@ -169,18 +168,31 @@
   min-height: 0;
 }
 
-/* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full cell. */
+/* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full cell's
+   height (via its own flex: 1 below) but, since this stays flex-direction: column,
+   NOT its width — align-items: flex-end leaves .hud-panel's width to its own content
+   (capped at max-width: 640px below) and pushes it against .hud's right edge. .hud
+   itself is flex: 1 (taking whatever width .top-bar-manager leaves it in .row-top),
+   so together this reads as "meters on the far right". */
 .hud {
-  grid-column: 3;
-  grid-row: 1;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   min-height: 0;
   min-width: 0;
 }
 
 .hud-panel {
   flex: 1;
+  /* .hud (see above) no longer stretches this to fill its own width — align-items:
+     flex-end there leaves this box free to size to its content instead, which
+     without an explicit width would otherwise mean the *background box itself*
+     shrinks to fit however narrow Meters' own internal content happens to be,
+     rather than reliably reading as one solid panel up to Meters' own 640px cap
+     (see .meters in Meters.css). min(640px, 100%) reproduces that cap here (100%
+     resolves against .hud's width even though this isn't stretched). */
+  width: min(640px, 100%);
   min-height: 0;
   display: flex;
   align-items: stretch;

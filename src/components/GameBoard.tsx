@@ -11,6 +11,7 @@ import Meters from './Meters'
 import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
+import DiscardZone from './DiscardZone'
 import DisintegrateEffect from './DisintegrateEffect'
 import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
 import SplashScreen from './SplashScreen'
@@ -100,12 +101,14 @@ const STAT_MAX = 500
 const BURNOUT_MAX = 1000
 const VESTING_MAX = 100
 const VESTING_PER_TURN = 1
-// These match .game-board's grid-template-columns/gap/padding in GameBoard.css — read
-// by the column1Width/cardScale effect below to figure out how much width is
-// actually left for column 1 once column 3's floor and the grid's own gaps/padding
-// are accounted for.
-const COLUMN3_MIN_WIDTH = 200
-const BOARD_COLUMN_GAP = 20
+// These match .game-board/.row-top/.row-middle/.row-bottom's gap/padding in
+// GameBoard.css — read by the cardScale effect below to figure out how much width
+// each row actually has once the board's own gaps/padding are accounted for, and how
+// much of that a row's non-card element (meters/Slack/discard) needs reserved.
+const ROW_ITEM_GAP = 20
+const METERS_MIN_WIDTH = 320 // reserved for .hud-panel in row-top, alongside the manager's deck+hand
+const HISTORY_MIN_WIDTH = 260 // reserved for .history-panel in row-middle, alongside the dropzone and Slack
+const SLACK_MIN_WIDTH = 260 // reserved for .slack-panel in row-middle, matching its own CSS min-width
 const BOARD_ROW_GAP = 20
 const BOARD_PADDING = 20
 // The rest of these match the fixed chrome around row 2's stacked cards (see
@@ -290,40 +293,31 @@ function GameBoard() {
   // first flight's source/dest rects being measured mid-layout-shift, which reads as
   // that card skipping its flight and just appearing already in the hand/manager row.
   const [pageLoaded, setPageLoaded] = useState(() => document.readyState === 'complete')
-  // Measured width of the wider of the manager's and player's deck+hand rows (see the
-  // ResizeObserver effect below) — applied to .game-board's grid-template-columns so
-  // the board's first column (manager hand / history / player hand) is exactly wide
-  // enough for them. Can't leave this column's width as plain `auto` and let CSS Grid
-  // figure it out: this column's cells size themselves via aspect-ratio from their
-  // row's height, and that row is an `fr` track — Chromium resolves that combination
-  // by treating the row height as effectively unbounded during the column's intrinsic
-  // sizing pass, giving a wildly inflated column width (confirmed directly in
-  // devtools). Measuring the actual rendered width here sidesteps that circular
-  // row-height/column-width dependency entirely.
-  const [column1Width, setColumn1Width] = useState<number | null>(null)
-  // Explicit pixel heights for column 1's three rows (manager hand / history / player
-  // hand — see GameBoard.css), set by the same effect as column1Width. Can't leave
-  // these as CSS `fr`/`auto` tracks: row 1's only other occupant is .hud (no fixed
-  // card-shaped size of its own) while row 3's is .discard-column (which does have
-  // one), so the two rows' intrinsic-sizing inputs aren't actually symmetric even
-  // though both are meant to fit one card — confirmed directly in devtools as the
-  // manager and player rows resolving to visibly different heights under `1fr 2fr
-  // 1fr`. Computing each row's height arithmetically from a single shared card-size
-  // formula (rather than measuring whatever CSS happened to resolve) guarantees the
-  // manager and player cards themselves always match — row 3 is taller only because
-  // .bottom-bar adds its own padding-bottom below the (same-size) player card, for
-  // clearance from the bottom of the screen (see BOTTOM_BAR_PADDING).
+  // Explicit pixel heights for the board's three rows (see .row-top/.row-middle/
+  // .row-bottom in GameBoard.css), set by the ResizeObserver effect below. Can't leave
+  // these as CSS `fr`/`auto` tracks: row-top's only other occupant is .hud (no fixed
+  // card-shaped size of its own) while row-bottom's is .discard-column (which does
+  // have one), so the two rows' intrinsic-sizing inputs aren't actually symmetric even
+  // though both are meant to fit one card — confirmed directly in devtools (back when
+  // this was still a CSS Grid) as the manager and player rows resolving to visibly
+  // different heights under `1fr 2fr 1fr`. Computing each row's height arithmetically
+  // from a single shared card-size formula (rather than measuring whatever CSS
+  // happened to resolve) guarantees the manager and player cards themselves always
+  // match — row-bottom is taller only because .bottom-bar adds its own padding-bottom
+  // below the (same-size) player card, for clearance from the bottom of the screen
+  // (see BOTTOM_BAR_PADDING).
   const [rowHeights, setRowHeights] = useState<[number, number, number] | null>(null)
   // Multiplies every card/deck's vw-based size formula (see Hand.css, ManagerHand.css,
-  // Deck.css) down from 1 when column1Width/rowHeights above would otherwise overflow
-  // the viewport — those formulas only know the viewport's raw width, not what else
-  // that width/height needs to share with (the meters/Slack column, on a viewport too
-  // narrow for both — an iPad in landscape, in particular — or the vertical space
-  // .game-board actually has), so something has to give; this shrinks the cards
-  // themselves rather than letting them spill out of column 1 or off the screen. Read
-  // synchronously via cardScaleRef (below) inside the same ResizeObserver callback
-  // that sets it, so each recompute measures against the true scale: 1 size rather
-  // than compounding on the previous frame's already-shrunk one.
+  // Deck.css) down from 1 when rowHeights above would otherwise overflow the
+  // viewport, or a row's cards + its other elements (meters/history/Slack/discard)
+  // wouldn't fit the viewport's width — those formulas only know the viewport's raw
+  // width, not what else that width/height needs to share with (an iPad in landscape,
+  // in particular, is too narrow for a row's cards plus its panel at full size), so
+  // something has to give; this shrinks the cards themselves rather than letting them
+  // overflow their row or the viewport. Read synchronously via cardScaleRef (below)
+  // inside the same ResizeObserver callback that sets it, so each recompute measures
+  // against the true scale: 1 size rather than compounding on the previous frame's
+  // already-shrunk one.
   const [cardScale, setCardScale] = useState(1)
   const cardScaleRef = useRef(1)
   // How many slots each hand actually renders (see the resize-sync effect below,
@@ -817,17 +811,17 @@ function GameBoard() {
     return () => window.removeEventListener('load', handleLoad)
   }, [pageLoaded])
 
-  // See column1Width/rowHeights/cardScale above — measures both sides' deck + hand
-  // width and takes the wider one, so the board's first column fits either row
-  // without waiting on CSS Grid to do it (which is exactly what's unreliable here).
-  // Also caps that width — and shrinks the cards via cardScale to match — against
-  // whatever space is actually left once column 2 (the dropzone) and column 3's floor
-  // width (matching .game-board's minmax(200px, 1fr), see GameBoard.css) are
-  // reserved. Row heights are computed the same way, but arithmetically rather than
-  // by measuring the rows themselves (see rowHeights' comment for why): one shared,
-  // scaled card-height value, identical to Hand.css's .hand-slot, drives all four
-  // "card rows" (manager hand, the two stacked history/active cards, player hand),
-  // plus each row's own fixed (unscaled) gap/padding chrome — see rowChromeHeight.
+  // See rowHeights/cardScale above — measures each row's own card-based elements
+  // (manager/player deck+hand, the active-column dropzone, the discard slot) and
+  // checks each row independently against the board's full width (every row now
+  // spans it, unlike the old shared column) minus a reserved minimum for that row's
+  // non-card panel (meters/history/Slack — see METERS_MIN_WIDTH/HISTORY_MIN_WIDTH/
+  // SLACK_MIN_WIDTH), taking whichever row needs the most shrinking. Row heights are
+  // computed arithmetically rather than by measuring the rows themselves (see
+  // rowHeights' comment for why): one shared, scaled card-height value, identical to
+  // Hand.css's .hand-slot, drives all four "card rows" (manager hand, the two stacked
+  // history/active cards, player hand), plus each row's own fixed (unscaled) gap/
+  // padding chrome — see rowChromeHeight.
   useLayoutEffect(() => {
     const boardEl = gameBoardRef.current
     const els = [managerDeckRef.current, managerHandRef.current, playerDeckRef.current, handRef.current]
@@ -839,30 +833,42 @@ function GameBoard() {
       // this, each pass would compute a new scale relative to an already-shrunk
       // measurement instead of the real one.
       const scale = cardScaleRef.current || 1
-      const managerWidth =
-        (managerDeckEl.getBoundingClientRect().width + 20 + managerHandEl.getBoundingClientRect().width) / scale
-      const playerWidth =
-        (playerDeckEl.getBoundingClientRect().width + 20 + playerHandEl.getBoundingClientRect().width) / scale
-      const naturalWidth = Math.max(managerWidth, playerWidth)
+      const managerRowWidth =
+        (managerDeckEl.getBoundingClientRect().width + ROW_ITEM_GAP + managerHandEl.getBoundingClientRect().width) /
+        scale
+      const playerRowWidth =
+        (playerDeckEl.getBoundingClientRect().width + ROW_ITEM_GAP + playerHandEl.getBoundingClientRect().width) /
+        scale
+      const activeColumnEl = boardEl.querySelector<HTMLElement>('.active-column')
+      const activeColumnWidth = (activeColumnEl?.getBoundingClientRect().width ?? 0) / scale
+      const discardColumnEl = boardEl.querySelector<HTMLElement>('.discard-column')
+      const discardColumnWidth = (discardColumnEl?.getBoundingClientRect().width ?? 0) / scale
 
-      const column2El = boardEl.querySelector<HTMLElement>('.active-column')
-      const column2Width = column2El?.getBoundingClientRect().width ?? 0
-      const reservedWidth = column2Width + COLUMN3_MIN_WIDTH + BOARD_COLUMN_GAP * 2 + BOARD_PADDING * 2
-      const availableWidth = Math.max(0, boardEl.getBoundingClientRect().width - reservedWidth)
-      const widthScale = naturalWidth > 0 ? Math.min(1, availableWidth / naturalWidth) : 1
+      // Every row spans the board's full width now (there's no shared column to
+      // divide it with), so the same availableWidth applies to all three checks below.
+      const availableWidth = Math.max(0, boardEl.getBoundingClientRect().width - BOARD_PADDING * 2)
+      const rowTopNeeded = managerRowWidth + ROW_ITEM_GAP + METERS_MIN_WIDTH
+      const rowMiddleNeeded = activeColumnWidth + ROW_ITEM_GAP * 2 + HISTORY_MIN_WIDTH + SLACK_MIN_WIDTH
+      const rowBottomNeeded = playerRowWidth + ROW_ITEM_GAP + discardColumnWidth
+      const widthScale = Math.min(
+        1,
+        availableWidth / Math.max(1, rowTopNeeded),
+        availableWidth / Math.max(1, rowMiddleNeeded),
+        availableWidth / Math.max(1, rowBottomNeeded),
+      )
 
       // Same 12vw * 7/5 formula as Hand.css's .hand-slot, computed directly from the
       // viewport rather than measured off a rendered card — this is the "one card"
       // unit that every row height below is built from. Four of these stack up across
-      // the three rows (row 1 is one, row 2 is two, row 3 is one).
+      // the three rows (row-top is one, row-middle is two, row-bottom is one).
       const naturalCardHeight = window.innerWidth * 0.12 * (7 / 5)
       const CARD_UNITS = 4
       // Every one of these is a literal, unscaled CSS px value (none of them are
       // written with var(--card-scale) — see BattleArea.css/GameBoard.css), so unlike
       // the card height itself, none of it shrinks when cardScale does. Scaling it
       // down here anyway (as an earlier version of this effect did) under-allocates
-      // row 2/row 3's actual height on any viewport where cardScale < 1, clipping the
-      // manager's card off the top of the (bottom-anchored) history area.
+      // row-middle/row-bottom's actual height on any viewport where cardScale < 1,
+      // clipping the manager's card off the top of the (bottom-anchored) history area.
       const rowChromeHeight =
         BOARD_ROW_GAP * 2 +
         BOTTOM_BAR_PADDING +
@@ -885,7 +891,6 @@ function GameBoard() {
       cardScaleRef.current = nextScale
       setCardScale(nextScale)
       setVisibleHandCards(visibleHandCardsForWidth(window.innerWidth))
-      setColumn1Width(Math.min(naturalWidth * nextScale, availableWidth))
       setRowHeights([
         cardHeight + HAND_SCROLLBAR_GUTTER,
         cardHeight * 2 + BATTLE_SLOT_GAP + HISTORY_PANEL_PADDING_TOP + HISTORY_PANEL_PADDING_BOTTOM,
@@ -1906,12 +1911,6 @@ function GameBoard() {
       className={`game-board${draggingCard ? ' game-board-dragging' : ''}`}
       style={
         {
-          ...(column1Width != null && {
-            gridTemplateColumns: `${column1Width}px auto minmax(${COLUMN3_MIN_WIDTH}px, 1fr)`,
-          }),
-          ...(rowHeights != null && {
-            gridTemplateRows: `${rowHeights[0]}px ${rowHeights[1]}px ${rowHeights[2]}px`,
-          }),
           '--card-scale': cardScale,
           '--visible-hand-cards': visibleHandCards,
         } as CSSProperties
@@ -1923,70 +1922,80 @@ function GameBoard() {
           GameOverScreen's own comment for why that timing matters on iPadOS. */}
       <GameOverScreen result={gameOver} onRestart={startNewGame} />
 
-      <div className="top-bar-manager">
-        <div className="side-row">
-          <div className="deck-wrap" ref={managerDeckRef}>
-            <Deck image="/cards/mc-manager-back-image.webp" count={30} />
+      <div className="row-top" style={rowHeights ? { height: rowHeights[0] } : undefined}>
+        <div className="top-bar-manager">
+          <div className="side-row">
+            <div className="deck-wrap" ref={managerDeckRef}>
+              <Deck image="/cards/mc-manager-back-image.webp" count={30} />
+            </div>
+            <div className="manager-hand-wrap" ref={managerHandRef}>
+              <ManagerHand
+                ids={MANAGER_SLOT_IDS.slice(0, managerHand.length)}
+                usedIds={usedManagerIds}
+                hiddenId={hiddenHandId}
+              />
+            </div>
           </div>
-          <div className="manager-hand-wrap" ref={managerHandRef}>
-            <ManagerHand
-              ids={MANAGER_SLOT_IDS.slice(0, managerHand.length)}
-              usedIds={usedManagerIds}
-              hiddenId={hiddenHandId}
+        </div>
+
+        <div className="hud">
+          <div className="hud-panel">
+            <Meters
+              backlog={backlog}
+              techDebt={techDebt}
+              burnout={burnout}
+              vesting={vesting}
+              backlogFlashKey={backlogFlashKey}
+              techDebtFlashKey={techDebtFlashKey}
+              burnoutFlashKey={burnoutFlashKey}
+              vestingFlashKey={vestingFlashKey}
+              backlogMaxed={backlogMaxed}
+              techDebtMaxed={techDebtMaxed}
+              burnoutMaxed={burnoutMaxed}
+              vestingMaxed={vestingMaxed}
             />
           </div>
         </div>
       </div>
 
-      <div className="hud">
-        <div className="hud-panel">
-          <Meters
-            backlog={backlog}
-            techDebt={techDebt}
-            burnout={burnout}
-            vesting={vesting}
-            backlogFlashKey={backlogFlashKey}
-            techDebtFlashKey={techDebtFlashKey}
-            burnoutFlashKey={burnoutFlashKey}
-            vestingFlashKey={vestingFlashKey}
-            backlogMaxed={backlogMaxed}
-            techDebtMaxed={techDebtMaxed}
-            burnoutMaxed={burnoutMaxed}
-            vestingMaxed={vestingMaxed}
-          />
-        </div>
+      <div className="row-middle" style={rowHeights ? { height: rowHeights[1] } : undefined}>
+        <BattleArea
+          ref={activeSlotRef}
+          history={history}
+          activePlayerCard={activePlayerCard}
+          activeManagerCard={activeManagerCard}
+          leader={leader}
+          lockMessage={lockMessage}
+          blurredTurns={blurTurnsRemaining}
+        />
+        <SlackPanel
+          channels={CHANNEL_ORDER}
+          activeChannel={activeSlackChannel}
+          onSelectChannel={setActiveSlackChannel}
+          messages={slackMessages}
+        />
       </div>
 
-      <BattleArea
-        ref={activeSlotRef}
-        history={history}
-        activePlayerCard={activePlayerCard}
-        activeManagerCard={activeManagerCard}
-        leader={leader}
-        lockMessage={lockMessage}
-        blurredTurns={blurTurnsRemaining}
-      />
-      <SlackPanel
-        channels={CHANNEL_ORDER}
-        activeChannel={activeSlackChannel}
-        onSelectChannel={setActiveSlackChannel}
-        messages={slackMessages}
-      />
+      <div className="row-bottom" style={rowHeights ? { height: rowHeights[2] } : undefined}>
+        <div className="bottom-bar">
+          <div className="side-row">
+            <div className="deck-wrap" ref={playerDeckRef}>
+              <Deck image="/cards/pc-player-back-image.webp" count={34} />
+            </div>
+            <div className="hand-wrap" ref={handRef}>
+              <Hand
+                cards={hand}
+                draggingCardId={draggingCard?.id ?? null}
+                lockedCardIds={lockedCardIds}
+                onCardPointerDown={handleCardPointerDown}
+                blurredTurns={blurTurnsRemaining}
+              />
+            </div>
+          </div>
+        </div>
 
-      <div className="bottom-bar">
-        <div className="side-row">
-          <div className="deck-wrap" ref={playerDeckRef}>
-            <Deck image="/cards/pc-player-back-image.webp" count={34} />
-          </div>
-          <div className="hand-wrap" ref={handRef}>
-            <Hand
-              cards={hand}
-              draggingCardId={draggingCard?.id ?? null}
-              lockedCardIds={lockedCardIds}
-              onCardPointerDown={handleCardPointerDown}
-              blurredTurns={blurTurnsRemaining}
-            />
-          </div>
+        <div className="discard-column discard-zone">
+          <DiscardZone />
         </div>
       </div>
 

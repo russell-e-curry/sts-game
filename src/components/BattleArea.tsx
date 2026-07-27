@@ -1,7 +1,6 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react'
 import type { ManagerCard, PlayerCard } from '../types'
 import Card from './Card'
-import DiscardZone from './DiscardZone'
 import SparkleBurst from './SparkleBurst'
 import './BattleArea.css'
 
@@ -174,9 +173,9 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
   return (
     <>
       {/* The "battle area" — where played cards end up, as opposed to .active-column
-          below, which is where a card sits while it's actually being played. Shares
-          its grid column with the manager/player hand rows (see GameBoard.css), so it
-          lines up with them without any measuring. */}
+          below, which is where a card sits while it's actually being played. Sits in
+          .row-middle (see GameBoard.css) alongside .active-column and the Slack
+          panel, flexing to fill whatever width they leave it. */}
       <div className="history-panel" ref={historyRowRef}>
         <div
           className="history-track"
@@ -234,8 +233,8 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
         </div>
       </div>
 
-      {/* The board's middle column, first cell (see GameBoard.css) — aligned to the
-          history row, separate from .history-panel, sized to just fit a card. Stacks
+      {/* Sits in .row-middle (see GameBoard.css) between the history panel and the
+          Slack panel — separate from .history-panel, sized to just fit a card. Stacks
           the manager's and player's active-card slots. */}
       <div className="active-column">
         <div className="battle-slot" ref={activeSlotRef}>
@@ -271,12 +270,6 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
             <div className="battle-slot-placeholder" />
           )}
         </div>
-      </div>
-
-      {/* The board's middle column, second cell — aligned to the player-hand row,
-          directly below .active-column. */}
-      <div className="discard-column discard-zone">
-        <DiscardZone />
       </div>
     </>
   )

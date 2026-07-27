@@ -102,19 +102,17 @@
   }
 }
 
-/* The board's middle column, aligned to the history row (see GameBoard.css) — same
-   row, same height — separate from .history-panel: this is where a card sits while
-   it's actually being played, not part of the "battle area" of already-played
-   history. Auto-width (just wide enough for a card plus some breathing room for its
-   own dashed border). */
+/* Sits in .row-middle (see GameBoard.css), between .history-panel and .slack-panel
+   — this is where a card sits while it's actually being played, not part of the
+   "battle area" of already-played history. height: 100% stretches to fill the row's
+   height (same as .history-panel/.slack-panel); width is left to flexbox's default
+   main-axis behavior (a flex item's width doesn't stretch to fill leftover space
+   unless flex-grow says so), so this naturally hugs a single card's width plus some
+   breathing room for its own dashed border, rather than needing an explicit rule. */
 .active-column {
   position: relative;
   min-height: 0;
   height: 100%;
-  /* Grid items stretch to fill their column's width by default — pin this to its own
-     content width instead, so it hugs a single card rather than stretching into
-     however wide the auto-sized column ends up being. */
-  justify-self: center;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -148,25 +146,27 @@
   height: 100%;
 }
 
-/* The board's middle column, second cell — directly below .active-column, aligned to
-   the player-hand row (see GameBoard.css) — same row, same height. The discard
-   target, formerly the player's hand's permanent sixth slot (see DiscardZone.tsx).
-   Sized the same way as a .hand-slot (see Hand.css) — matching its outer slot size
-   (a touch larger than a hand card's own rendered size, since .hand-slot .game-card
-   only fills 94% of the slot) reads as "a little bigger than a player card", which
-   is the intent here. --card-scale is required, not optional, here: without it this
-   stayed full-size whenever cardScale shrank the actual hand cards down, throwing
-   off row 3's height relative to row 1's (see GameBoard.tsx's rowHeights comment).
-   align-self: start (not center) so row 3's extra BOTTOM_BAR_PADDING worth of height
-   (see GameBoard.tsx) lands below this, same as it does below the player's hand in
-   .bottom-bar, instead of splitting it evenly above and below. */
+/* Sits in .row-bottom (see GameBoard.css), directly after the player's deck+hand.
+   The discard target, formerly the player's hand's permanent sixth slot (see
+   DiscardZone.tsx). Sized the same way as a .hand-slot (see Hand.css) — matching its
+   outer slot size (a touch larger than a hand card's own rendered size, since
+   .hand-slot .game-card only fills 94% of the slot) reads as "a little bigger than a
+   player card", which is the intent here. --card-scale is required, not optional,
+   here: without it this stayed full-size whenever cardScale shrank the actual hand
+   cards down, throwing off .row-bottom's height relative to .row-top's (see
+   GameBoard.tsx's rowHeights comment). This explicit height also means the row's
+   default stretch alignment doesn't apply to it (only elements left at an auto
+   cross-size actually stretch) — it degrades to top-aligned instead, which is
+   exactly what's wanted: this lines up with the top of .bottom-bar's deck/hand
+   cards, leaving .row-bottom's extra BOTTOM_BAR_PADDING worth of height (see
+   GameBoard.tsx) as slack below it, same as it sits below the player's hand in
+   .bottom-bar, instead of splitting evenly above and below. Written out explicitly
+   via align-self rather than relying on that implicit degradation, for clarity. */
 .discard-column {
   height: calc(var(--card-scale, 1) * calc(12vw * 7 / 5));
   aspect-ratio: 5 / 7;
   width: auto;
-  /* Same reasoning as .active-column's justify-self above. */
-  justify-self: center;
-  align-self: start;
+  align-self: flex-start;
   border: 2px dashed rgba(255, 255, 255, 0.3);
   border-radius: 12px;
   box-sizing: border-box;
