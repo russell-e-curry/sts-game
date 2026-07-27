@@ -1,7 +1,8 @@
 {
   "title": "Team Offsite",
+  "type" : "Eliminate",
   "category": "Management",
   "action": "eliminate",
-  "character": "CMO",
+  "target": { "kind": "character", "selector": "named", "name": "CMO" },
   "description": "You accidentally say three steps back instead of two. Okay, maybe not accidentally. So much for the CMO"
 }
