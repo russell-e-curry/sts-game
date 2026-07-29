@@ -25,6 +25,13 @@
   letter-spacing: 0.6px;
 }
 
+.discard-zone-cost {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff6b6b;
+}
+
 /* Reuses the same .game-board-dragging flag that already suppresses stray hover
    elsewhere while a card's in flight (see GameBoard.css) to cue where a dragged
    card can be dropped, without needing pointer-tracked hover state of its own. */

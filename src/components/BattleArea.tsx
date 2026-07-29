@@ -40,6 +40,12 @@ interface BattleAreaProps {
    * `leader`). Has no bearing on the responding side's own slot, which always falls
    * back to its normal empty-state placeholder. */
   leader: 'manager' | 'player'
+  /** True once the player has led the current round (dropped the opening card) —
+   * suppresses the "Your Turn" placeholder in the player's slot until the round
+   * actually advances, even though `activePlayerCard` goes back to null (and
+   * `leader` hasn't flipped yet) the instant the round resolves (see GameBoard's
+   * `playerHasLed`). */
+  playerHasLed: boolean
   /** Briefly shown in the player's active-column slot when a locked card is dropped
    * there instead of played (see GameBoard's showLockMessage). */
   lockMessage?: string | null
@@ -53,7 +59,7 @@ interface BattleAreaProps {
 const MIN_THUMB_WIDTH = 40
 
 const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleArea(
-  { history, activePlayerCard, activeManagerCard, leader, lockMessage, blurredTurns },
+  { history, activePlayerCard, activeManagerCard, leader, playerHasLed, lockMessage, blurredTurns },
   activeSlotRef,
 ) {
   const historyRowRef = useRef<HTMLDivElement>(null)
@@ -262,7 +268,7 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
             <div className="battle-slot-placeholder battle-slot-placeholder-player">
               <p className="battle-slot-placeholder-label">Play a Card</p>
             </div>
-          ) : leader === 'player' ? (
+          ) : leader === 'player' && !playerHasLed ? (
             <div className="battle-slot-placeholder battle-slot-placeholder-player">
               <p className="battle-slot-placeholder-label">Your Turn</p>
             </div>

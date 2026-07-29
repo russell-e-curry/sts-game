@@ -1,0 +1,9 @@
+{
+  "title": "Quiet Quitting",
+  "category": "wellness",
+  "action": "recurring",
+  "playableAgainst": ["*"],
+  "description": "You ever get that feeling you were forgetting about something? Oh yeah, that was it - work.",
+  "vesting" : 1,
+  "burnout": -1
+}

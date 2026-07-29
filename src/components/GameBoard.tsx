@@ -101,6 +101,9 @@ const STAT_MAX = 500
 const BURNOUT_MAX = 1000
 const VESTING_MAX = 100
 const VESTING_PER_TURN = 1
+// The player's first discard in a round costs this much Burnout; each further
+// discard that same round doubles it (5, 10, 20, ...) — see discardStreak.
+const DISCARD_BASE_BURNOUT_COST = 5
 // These match .game-board/.row-top/.row-middle/.row-bottom's gap/padding in
 // GameBoard.css — read by the cardScale effect below to figure out how much width
 // each row actually has once the board's own gaps/padding are accounted for, and how
@@ -249,6 +252,11 @@ function GameBoard() {
   const [techDebt, setTechDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
   const [vesting, setVesting] = useState(0)
+  // How many cards the player has discarded so far this round — the next discard's
+  // Burnout cost is DISCARD_BASE_BURNOUT_COST doubled once per prior discard (5, 10,
+  // 20, ...), so idly cycling the hand gets punishing fast. Reset to 0 whenever a new
+  // round starts (see the roundKey effect below).
+  const [discardStreak, setDiscardStreak] = useState(0)
   // Bumped independently for whichever meter just updated (see the round-resolve
   // effect below, which flashes/updates the four one at a time) — passed to Meters as
   // a remount key for that meter's flash overlay (see meter-bar-flash in Meters.css)
@@ -277,6 +285,13 @@ function GameBoard() {
   // round alongside roundKey (see the meter cascade's final step) so the two sides
   // strictly alternate who leads.
   const [leader, setLeader] = useState<'manager' | 'player'>('manager')
+  // True from the moment the player leads a round (drops the opening card into the
+  // otherwise-empty active slot, see handleDropCard's `leading` case) until the round
+  // actually advances — `leader` itself doesn't flip until well after the cards clear
+  // back to null (see the meter cascade's final step), so without this the "Your
+  // Turn" placeholder would flash back on during that gap, between the round
+  // resolving and the manager's slot switching over to "Manager's Turn".
+  const [playerHasLed, setPlayerHasLed] = useState(false)
   // Set once backlog/technical debt/burnout hits its cap (lose) or vesting hits 100%
   // (win) — see the effect below. Also gates the round-start effect so the manager
   // stops playing cards once the game has ended.
@@ -435,12 +450,13 @@ function GameBoard() {
   const flightKeyCounter = useRef(0)
   // Every card ever played with action 'recurring' (that wasn't reversed away),
   // whose deltas keep getting re-applied on every subsequent turn — not just the
-  // turn it was played.
+  // turn it was played. A 'character'-action card counts as recurring too (see
+  // playerIsRecurring/managerIsRecurring below).
   const activeRecurringEffects = useRef<RecurringEffect[]>([])
   // Names of characters whose 'character'-action card has resolved on their side —
   // once added, stays forever (nothing currently un-introduces a character). Gates
-  // isCardLocked below: a 'coding' or 'meetings' card naming a character can't be
-  // played on that side until that character's own introduction card has landed.
+  // isCardLocked below: any card naming a character can't be played on that side
+  // until that character's own introduction card has landed.
   const revealedCharacters = useRef<{ player: Set<string>; manager: Set<string> }>({
     player: new Set(),
     manager: new Set(),
@@ -797,6 +813,11 @@ function GameBoard() {
   useEffect(() => {
     vestingRef.current = vesting
   }, [vesting])
+  // New round, fresh discard streak — the next discard costs DISCARD_BASE_BURNOUT_COST
+  // again instead of wherever the doubling left off last round.
+  useEffect(() => {
+    setDiscardStreak(0)
+  }, [roundKey])
   useEffect(() => {
     handContentRef.current = hand
   }, [hand])
@@ -978,14 +999,15 @@ function GameBoard() {
     runPlayerDealQueue(maybeCompleteInitialDeal)
   }, [hand.length, managerHand.length])
 
-  // A 'coding' or 'meetings' card naming a character is a follow-up to that
+  // Any card naming a character (regardless of category) is a follow-up to that
   // character's own 'character'-action introduction card, and can't be played on
   // this side until that introduction has resolved (see revealedCharacters above).
+  // Compares case-insensitively since the same character name isn't always cased
+  // identically across the introduction card and its follow-ups.
   const isCardLocked = (card: PlayerCard | ManagerCard, side: 'player' | 'manager') =>
-    (card.category === 'coding' || card.category === 'meetings') &&
     card.action !== 'character' &&
     !!card.character &&
-    !revealedCharacters.current[side].has(card.character)
+    ![...revealedCharacters.current[side]].some((c) => c.toLowerCase() === card.character!.toLowerCase())
 
   // Shown in the active column's player slot for a few seconds, then cleared —
   // called instead of actually playing a card whose character hasn't been
@@ -1037,6 +1059,7 @@ function GameBoard() {
     }
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
     setActivePlayerCard(card)
+    if (leading) setPlayerHasLed(true)
     playerDiscard.current.push(card)
     // Goes through the same queue a resize's growth deals use (see
     // runPlayerDealQueue) rather than calling startPlayerDraw directly — that
@@ -1063,6 +1086,11 @@ function GameBoard() {
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
     playerDiscard.current.push(card)
     playSound('gm-action-player-discard')
+
+    const burnoutCost = DISCARD_BASE_BURNOUT_COST * 2 ** discardStreak
+    setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + burnoutCost)))
+    setBurnoutFlashKey((k) => k + 1)
+    setDiscardStreak((s) => s + 1)
 
     if (!rect) {
       // See handleDropCard's comment on why this goes through the queue instead of
@@ -1153,6 +1181,7 @@ function GameBoard() {
     setTechDebt(0)
     setBurnout(STARTING_BURNOUT)
     setVesting(0)
+    setDiscardStreak(0)
     setBacklogFlashKey(0)
     setTechDebtFlashKey(0)
     setBurnoutFlashKey(0)
@@ -1163,6 +1192,7 @@ function GameBoard() {
     setVestingMaxed(false)
     setRoundKey(0)
     setLeader('manager')
+    setPlayerHasLed(false)
     setGameOver(null)
     setSlackMessages([])
     setActiveSlackChannel(CHANNEL_ORDER[0])
@@ -1338,10 +1368,33 @@ function GameBoard() {
       )
     }
 
+    // An 'eliminate' + target:'character' card can only take down a character the
+    // player has actually played — either still standing in the battle area
+    // (characterPlays.current.player, from an earlier round) or the very card they
+    // just dropped this round (activePlayerCard, when the manager is responding
+    // rather than leading) — never one that hasn't appeared at all. See
+    // findEliminatedCharacterRoundIds' matching `currentRoundCharacter` handling,
+    // which resolves this same "current drop" case once the card is actually played.
+    const hasEligibleCharacterTarget = (c: ManagerCard) => {
+      if (c.action !== 'eliminate' || c.target?.kind !== 'character') return true
+      const target = c.target
+      const battleArea = characterPlays.current.player
+      const currentDrop =
+        activePlayerCard?.action === 'character' && activePlayerCard.character
+          ? activePlayerCard.character
+          : undefined
+      if (target.selector === 'all' || target.selector === 'last') return battleArea.length > 0 || !!currentDrop
+      return (
+        battleArea.some((p) => p.character.toLowerCase() === target.name.toLowerCase()) ||
+        currentDrop?.toLowerCase() === target.name.toLowerCase()
+      )
+    }
+
     const handEntries = managerHand
       .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
       .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
       .filter((entry) => !isCardLocked(entry.card, 'manager'))
+      .filter((entry) => hasEligibleCharacterTarget(entry.card))
     if (handEntries.length === 0) return
 
     // Normalized (percent-of-max) estimate of how much playing this card would
@@ -1501,8 +1554,14 @@ function GameBoard() {
       // itself).
       const cancelled = activePlayerCard.action === 'cancel'
 
-      const playerIsRecurring = activePlayerCard.action === 'recurring'
-      const managerIsRecurring = activeManagerCard.action === 'recurring' && !reversed && !cancelled
+      // A 'character'-action card is also recurring — once played, its own stat
+      // deltas (if any) keep reapplying every turn just like a plain 'recurring'
+      // card, alongside introducing the character (see revealedCharacters below).
+      const playerIsRecurring = activePlayerCard.action === 'recurring' || activePlayerCard.action === 'character'
+      const managerIsRecurring =
+        (activeManagerCard.action === 'recurring' || activeManagerCard.action === 'character') &&
+        !reversed &&
+        !cancelled
 
       // A 'reset' card wipes backlog and/or technical debt to 0 outright — reuses the
       // same '*' clearable-delta sentinel applyClearableDelta already honors for
@@ -1543,7 +1602,7 @@ function GameBoard() {
         target: Extract<CardTarget, { kind: 'character' }>,
       ) => {
         const plays = characterPlays.current[targetSide]
-        const matches =
+        const matches: { character: string; roundId: string }[] =
           target.selector === 'all'
             ? plays.splice(0, plays.length)
             : (() => {
@@ -1553,6 +1612,31 @@ function GameBoard() {
                     : plays.findLastIndex((p) => p.character.toLowerCase() === target.name.toLowerCase())
                 return index < 0 ? [] : plays.splice(index, 1)
               })()
+
+        // The character card just played THIS round on targetSide hasn't reached
+        // characterPlays yet — that registration happens further below, after every
+        // elimination this round has already been resolved — so without this it could
+        // never be a valid target (see autoPlayManagerCard's matching
+        // hasEligibleCharacterTarget check, which allows the manager to aim an
+        // eliminate-character card at exactly this "current drop" case).
+        const currentRoundCard = targetSide === 'player' ? activePlayerCard : cancelled ? undefined : activeManagerCard
+        const currentRoundCharacter =
+          currentRoundCard?.action === 'character' && currentRoundCard.character
+            ? currentRoundCard.character
+            : undefined
+        let snipedCurrentRound = false
+        if (
+          currentRoundCharacter &&
+          (target.selector === 'all' ||
+            (target.selector === 'last' && matches.length === 0) ||
+            (target.selector === 'named' &&
+              matches.length === 0 &&
+              currentRoundCharacter.toLowerCase() === target.name.toLowerCase()))
+        ) {
+          matches.push({ character: currentRoundCharacter, roundId })
+          snipedCurrentRound = true
+        }
+
         const roundIds: string[] = []
         matches.forEach((match) => {
           revealedCharacters.current[targetSide].delete(match.character)
@@ -1569,30 +1653,32 @@ function GameBoard() {
             }
           })
         })
-        return roundIds
+        return { roundIds, snipedCurrentRound }
       }
       const findEliminatedRoundIds = (
         eliminatingCard: PlayerCard | ManagerCard,
         targetSide: 'player' | 'manager',
-      ): { roundIds: string[]; eliminated: boolean } => {
-        if (eliminatingCard.action !== 'eliminate') return { roundIds: [], eliminated: false }
+      ): { roundIds: string[]; eliminated: boolean; snipedCurrentRound: boolean } => {
+        if (eliminatingCard.action !== 'eliminate')
+          return { roundIds: [], eliminated: false, snipedCurrentRound: false }
         if (eliminatingCard.target?.kind === 'character') {
-          return { roundIds: findEliminatedCharacterRoundIds(targetSide, eliminatingCard.target), eliminated: true }
+          const { roundIds, snipedCurrentRound } = findEliminatedCharacterRoundIds(targetSide, eliminatingCard.target)
+          return { roundIds, eliminated: true, snipedCurrentRound }
         }
         for (let i = activeRecurringEffects.current.length - 1; i >= 0; i--) {
           const effect = activeRecurringEffects.current[i]
           if (!effect.stopped && effect.side === targetSide && effect.category === eliminatingCard.category) {
             effect.stopped = true
-            return { roundIds: [effect.roundId], eliminated: false }
+            return { roundIds: [effect.roundId], eliminated: false, snipedCurrentRound: false }
           }
         }
-        return { roundIds: [], eliminated: false }
+        return { roundIds: [], eliminated: false, snipedCurrentRound: false }
       }
       const managerElimination = findEliminatedRoundIds(activePlayerCard, 'manager')
       // A cancelled manager card had no effect this round, so it can't have eliminated
       // anything either.
       const playerElimination = cancelled
-        ? { roundIds: [], eliminated: false }
+        ? { roundIds: [], eliminated: false, snipedCurrentRound: false }
         : findEliminatedRoundIds(activeManagerCard, 'player')
 
       // A 'block recurring' card suspends every still-active OPPOSING-side recurring
@@ -1709,13 +1795,24 @@ function GameBoard() {
       }
 
       // A 'character'-action card introduces its character to that side's story —
-      // unlocking any 'coding' card naming the same character (see isCardLocked). A
-      // cancelled manager card never took effect, so it doesn't introduce anyone.
-      if (activePlayerCard.action === 'character' && activePlayerCard.character) {
+      // unlocking any card naming the same character (see isCardLocked). A
+      // cancelled manager card never took effect, so it doesn't introduce anyone —
+      // nor does one the opposing side's eliminate-character card sniped this same
+      // round (see findEliminatedCharacterRoundIds' snipedCurrentRound).
+      if (
+        activePlayerCard.action === 'character' &&
+        activePlayerCard.character &&
+        !managerElimination.snipedCurrentRound
+      ) {
         revealedCharacters.current.player.add(activePlayerCard.character)
         characterPlays.current.player.push({ character: activePlayerCard.character, roundId })
       }
-      if (activeManagerCard.action === 'character' && !cancelled && activeManagerCard.character) {
+      if (
+        activeManagerCard.action === 'character' &&
+        !cancelled &&
+        activeManagerCard.character &&
+        !playerElimination.snipedCurrentRound
+      ) {
         revealedCharacters.current.manager.add(activeManagerCard.character)
         characterPlays.current.manager.push({ character: activeManagerCard.character, roundId })
       }
@@ -1853,6 +1950,7 @@ function GameBoard() {
           setRoundKey((k) => k + 1)
           // Whoever led this round, the other side leads the next one.
           setLeader((prev) => (prev === 'manager' ? 'player' : 'manager'))
+          setPlayerHasLed(false)
 
           // Once per round, a random still-unused flavor message (or whole
           // conversation) posts to its channel and nudges the meters same as a played
@@ -1965,6 +2063,7 @@ function GameBoard() {
           activePlayerCard={activePlayerCard}
           activeManagerCard={activeManagerCard}
           leader={leader}
+          playerHasLed={playerHasLed}
           lockMessage={lockMessage}
           blurredTurns={blurTurnsRemaining}
         />
@@ -1996,7 +2095,7 @@ function GameBoard() {
         </div>
 
         <div className="discard-column discard-zone">
-          <DiscardZone />
+          <DiscardZone burnoutCost={DISCARD_BASE_BURNOUT_COST * 2 ** discardStreak} />
         </div>
       </div>
 

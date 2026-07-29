@@ -1,10 +1,16 @@
 import './DiscardZone.css'
 
+interface DiscardZoneProps {
+  // Burnout cost of the player's next discard this round — doubles with each
+  // discard already spent this round (see DISCARD_BASE_BURNOUT_COST in GameBoard).
+  burnoutCost: number
+}
+
 // Renders as the hand's permanent sixth slot (see Hand.tsx) — never dealt a card,
 // just a drop target. GameBoard's pointerup handler checks for `.discard-zone` in
 // the same way it already checks for `.history-panel`/`.active-column` to detect a
 // card played into the battle.
-function DiscardZone() {
+function DiscardZone({ burnoutCost }: DiscardZoneProps) {
   return (
     <div className="discard-zone-content">
       <svg
@@ -23,6 +29,7 @@ function DiscardZone() {
         <path d="M14 11v6" />
       </svg>
       <p className="discard-zone-label">Discard</p>
+      <p className="discard-zone-cost">Burnout +{burnoutCost}</p>
     </div>
   )
 }

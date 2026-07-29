@@ -1,0 +1,11 @@
+{
+  "title": "Fail Faster",
+  "category": "Management",
+  "type" : "Recurring",
+  "character" : "Consultants",
+  "description": "More sprints equals more producitivity, the consultants suggest you move your sprints to two hours instead of two weeks.",
+  "action" : "recurring",
+  "backlog" : 5,
+  "techDebt" : 5
+
+}

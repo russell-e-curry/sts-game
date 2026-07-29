@@ -1,0 +1,10 @@
+{
+  "title": "Team Building",
+  "category": "Management",
+   "type"  : "Eliminate",
+  "action": "Eliminate",
+  "target": { "kind": "character", "selector": "named", "name": "DevOps Guy" },
+  "description": "If it starts with \"Hold my beer!\" it's not going to end well. The devops team is about to get smaller.",
+  "techDebt": 100,
+  "burnout" : 50
+}

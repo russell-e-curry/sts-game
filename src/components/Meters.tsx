@@ -58,6 +58,14 @@ function Meters({
   const burnoutPct = pct(burnout, BURNOUT_MAX)
   const vestingPct = pct(vesting, VESTING_MAX)
 
+  // Points left before this meter hits the event it triggers — game-over for the
+  // three danger stats, the win condition for vesting. Clamped at 0 in case a delta
+  // ever lands a hair past max before the next clamp pass corrects it.
+  const backlogRemaining = Math.max(0, STAT_MAX - backlog)
+  const techDebtRemaining = Math.max(0, STAT_MAX - techDebt)
+  const burnoutRemaining = Math.max(0, BURNOUT_MAX - burnout)
+  const vestingRemaining = Math.max(0, VESTING_MAX - vesting)
+
   return (
     <div className="meters">
       <div className="meters-column">
@@ -72,6 +80,7 @@ function Meters({
               style={{ width: `${backlogPct}%` }}
             />
             {!!backlogFlashKey && <div key={backlogFlashKey} className="meter-bar-flash" />}
+            <span className="meter-bar-remaining">{backlogRemaining} remaining</span>
           </div>
         </div>
 
@@ -86,6 +95,7 @@ function Meters({
               style={{ width: `${techDebtPct}%` }}
             />
             {!!techDebtFlashKey && <div key={techDebtFlashKey} className="meter-bar-flash" />}
+            <span className="meter-bar-remaining">{techDebtRemaining} remaining</span>
           </div>
         </div>
       </div>
@@ -102,13 +112,14 @@ function Meters({
               style={{ width: `${burnoutPct}%` }}
             />
             {!!burnoutFlashKey && <div key={burnoutFlashKey} className="meter-bar-flash" />}
+            <span className="meter-bar-remaining">{burnoutRemaining} remaining</span>
           </div>
         </div>
 
         <div className="meter-bar">
           <div className="meter-bar-top">
             <span className="meter-bar-label">Vesting</span>
-            <span className="meter-bar-value meter-bar-value-vesting">{vesting}</span>
+            <span className="meter-bar-value meter-bar-value-vesting">{vestingPct}%</span>
           </div>
           <div className="meter-bar-track">
             <div
@@ -116,6 +127,7 @@ function Meters({
               style={{ width: `${vestingPct}%` }}
             />
             {!!vestingFlashKey && <div key={vestingFlashKey} className="meter-bar-flash" />}
+            <span className="meter-bar-remaining">{vestingRemaining} remaining</span>
           </div>
         </div>
       </div>
