@@ -38,6 +38,20 @@
   gap: 20px;
 }
 
+/* Mirrors .hud's own flex: 1 (below) so .top-bar-manager — the only other flex: 0 0
+   auto item in the row — sits centered between them, while .hud's content still
+   hugs the row's real right edge via its own align-items: flex-end. */
+.row-top-spacer {
+  flex: 1;
+}
+
+/* .bottom-bar and .discard-column (see BattleArea.css) are both flex: 0 0 auto/
+   content-sized, so centering the row centers that pair as a group — the discard
+   zone stays put directly after the hand instead of pinning to the row's edge. */
+.row-bottom {
+  justify-content: center;
+}
+
 .game-credit {
   position: absolute;
   right: 20px;

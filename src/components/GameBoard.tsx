@@ -2021,6 +2021,10 @@ function GameBoard() {
       <GameOverScreen result={gameOver} onRestart={startNewGame} />
 
       <div className="row-top" style={rowHeights ? { height: rowHeights[0] } : undefined}>
+        {/* Empty flex:1 spacer, symmetric with .hud's own flex:1 (see GameBoard.css)
+            so .top-bar-manager sits centered in the row while .hud's content still
+            hugs the row's actual right edge via its own align-items: flex-end. */}
+        <div className="row-top-spacer" aria-hidden="true" />
         <div className="top-bar-manager">
           <div className="side-row">
             <div className="deck-wrap" ref={managerDeckRef}>
