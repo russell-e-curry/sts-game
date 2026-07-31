@@ -1,7 +1,7 @@
 {
   "title": "Switch Teams",
-  "category": "coding",
-  "action": "reset",
+  "category": "Coding",
+  "action": "Reset",
   "description": "New team, new stack, new Slack channels to leave on read. Nobody here has heard of your backlog, and you intend to keep it that way.",
   "burnout": -100
 }

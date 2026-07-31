@@ -1,8 +1,8 @@
 {
   "title": "Nepotism",
-  "category": "coding",
-  "action": "recurring",
-  "character": "boss' nephew",
+  "category": "Coding",
+  "action": "Recurring",
+  "character": "Boss' Nephew",
   "description": "Your boss' slob nephew invents his own CI/CD platform, the boss wants it implemented asap.",
   "backlog": 5,
   "techDebt": 5

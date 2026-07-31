@@ -1,8 +1,8 @@
 {
   "title": "The Boss's Nephew",
   "category": "Management",
-  "action": "character",
-  "character" : "boss' nephew",
+  "action": "Character",
+  "character" : "Boss' Nephew",
   "description": "Your boss hires his slob nephew, who has no skills apart from spilling food on his shirt.",
   "backlog": 10,
   "burnout": 5

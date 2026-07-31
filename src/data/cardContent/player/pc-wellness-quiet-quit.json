@@ -1,7 +1,7 @@
 {
   "title": "Quiet Quitting",
-  "category": "wellness",
-  "action": "recurring",
+  "category": "Wellness",
+  "action": "Recurring",
   "playableAgainst": ["*"],
   "description": "You ever get that feeling you were forgetting about something? Oh yeah, that was it - work.",
   "vesting" : 1,

@@ -1,7 +1,7 @@
 {
   "title": "Hack the Reorg",
   "category": "Management",
-  "action": "eliminate",
-  "target": { "kind": "character", "selector": "last" },
+  "action": "Eliminate",
+  "target": { "kind": "Character", "selector": "Last" },
   "description": "You and the intern hack HR's plans for the upcoming reorg. Eliminates the most recent character your manager played."
 }

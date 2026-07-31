@@ -1,7 +1,7 @@
 {
   "title": "Refactor the Monolith",
-  "category": "coding",
-  "action": "one time",
+  "category": "Coding",
+  "action": "One Time",
   "description": "Your manager just learned about microservices, clusterfuck ahoy!",
   "backlog": 50,
   "burnout": 25

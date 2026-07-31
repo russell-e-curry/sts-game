@@ -2,8 +2,8 @@
   "title": "Team Building",
   "category": "Management",
   "type" : "Eliminate",
-  "action": "eliminate",
-  "target" : { "kind": "character", "selector": "named", "name": "Intern" },
+  "action": "Eliminate",
+  "target" : { "kind": "Character", "selector": "Named", "name": "Intern" },
   "description": "Somebody really should have tied that down. You're going to need a new intern."
  
 }

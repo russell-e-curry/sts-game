@@ -6,7 +6,7 @@ interface CardBase {
   /** Thematic category. Displayed on the card face. */
   category: CardCategory
   /** What kind of effect this card has. Drives the card's actual gameplay behavior. */
-  action: 'one time' | 'recurring' | 'reversal' | 'eliminate' | 'reset' | 'cancel' | 'character' | 'blur'
+  action: 'One Time' | 'Recurring' | 'Reversal' | 'Eliminate' | 'Reset' | 'Cancel' | 'Character' | 'Blur'
   /** Purely cosmetic label displayed on the card face (next to the category) in place of `action` — has no effect on gameplay. Always populated by the loaders in data/cards.ts and data/managerCards.ts, falling back to `action` when the JSON omits it. */
   type: string
   description: string
@@ -22,11 +22,11 @@ interface CardBase {
   burnout?: number
   /** Signed point delta applied to vesting when this card resolves (max 100). Displayed on the card face as points, not a percentage. Omitted if this card doesn't touch it. */
   vesting?: number
-  /** A secondary effect this card applies alongside its stat deltas, e.g. "block recurring" — combined with `target` and `duration`. Omitted if this card has no secondary effect. */
+  /** A secondary effect this card applies alongside its stat deltas, e.g. "Block Recurring" — combined with `target` and `duration`. Omitted if this card has no secondary effect. */
   effect?: string
-  /** See CardTarget. Which recurring card category `effect` applies to (`{ kind: 'category' }`), which character(s) an `action: 'eliminate'` card takes down (`{ kind: 'character' }`), or which single stat an `action: 'reset'` card clears (`{ kind: 'stat' }`) — omitted on a reset card clears both stats, or on an eliminate card eliminates by matching `category` against a recurring effect instead. Omitted if this card has no secondary effect and isn't an eliminate-character or targeted-reset card. */
+  /** See CardTarget. Which recurring card category `effect` applies to (`{ kind: 'Category' }`), which character(s) an `action: 'Eliminate'` card takes down (`{ kind: 'Character' }`), or which single stat an `action: 'Reset'` card clears (`{ kind: 'Stat' }`) — omitted on a reset card clears both stats, or on an eliminate card eliminates by matching `category` against a recurring effect instead. Omitted if this card has no secondary effect and isn't an eliminate-character or targeted-reset card. */
   target?: CardTarget
-  /** Number of turns `effect` lasts — also read by a manager `action: 'blur'` card (which has no `effect`) for how many turns it blurs the player's hand and the shared dropzone/history. Omitted for the rest of the game rather than a fixed number of turns. */
+  /** Number of turns `effect` lasts — also read by a manager `action: 'Blur'` card (which has no `effect`) for how many turns it blurs the player's hand and the shared dropzone/history. Omitted for the rest of the game rather than a fixed number of turns. */
   duration?: number
   /** Which manager card `category` values this (player) card can be played against — '*' allows any category. Omitted defaults to only its own `category`. */
   playableAgainst?: (CardCategory | '*')[]

@@ -1005,7 +1005,7 @@ function GameBoard() {
   // Compares case-insensitively since the same character name isn't always cased
   // identically across the introduction card and its follow-ups.
   const isCardLocked = (card: PlayerCard | ManagerCard, side: 'player' | 'manager') =>
-    card.action !== 'character' &&
+    card.action !== 'Character' &&
     !!card.character &&
     ![...revealedCharacters.current[side]].some((c) => c.toLowerCase() === card.character!.toLowerCase())
 
@@ -1357,7 +1357,7 @@ function GameBoard() {
     // active, not-already-suspended player recurring effect it would actually
     // suspend — matching `target`, or any type for '*'.
     const hasEligibleBlockTarget = (c: ManagerCard) => {
-      if (c.effect !== 'block recurring' || c.target?.kind !== 'category') return false
+      if (c.effect !== 'Block Recurring' || c.target?.kind !== 'Category') return false
       const target = c.target
       return activeRecurringEffects.current.some(
         (e) =>
@@ -1376,14 +1376,14 @@ function GameBoard() {
     // findEliminatedCharacterRoundIds' matching `currentRoundCharacter` handling,
     // which resolves this same "current drop" case once the card is actually played.
     const hasEligibleCharacterTarget = (c: ManagerCard) => {
-      if (c.action !== 'eliminate' || c.target?.kind !== 'character') return true
+      if (c.action !== 'Eliminate' || c.target?.kind !== 'Character') return true
       const target = c.target
       const battleArea = characterPlays.current.player
       const currentDrop =
-        activePlayerCard?.action === 'character' && activePlayerCard.character
+        activePlayerCard?.action === 'Character' && activePlayerCard.character
           ? activePlayerCard.character
           : undefined
-      if (target.selector === 'all' || target.selector === 'last') return battleArea.length > 0 || !!currentDrop
+      if (target.selector === 'All' || target.selector === 'Last') return battleArea.length > 0 || !!currentDrop
       return (
         battleArea.some((p) => p.character.toLowerCase() === target.name.toLowerCase()) ||
         currentDrop?.toLowerCase() === target.name.toLowerCase()
@@ -1402,9 +1402,9 @@ function GameBoard() {
     // stat to 0, which only helps the player, so they're scored as improving
     // (negative) that stat rather than raising it.
     const damage = (c: ManagerCard) => {
-      const backlogDelta = c.action === 'reset' || c.backlog === '*' ? -backlog : (c.backlog ?? 0)
+      const backlogDelta = c.action === 'Reset' || c.backlog === '*' ? -backlog : (c.backlog ?? 0)
       const techDebtDelta =
-        c.action === 'reset' || c.techDebt === '*' ? -techDebt : (c.techDebt ?? 0)
+        c.action === 'Reset' || c.techDebt === '*' ? -techDebt : (c.techDebt ?? 0)
       return (
         backlogDelta / STAT_MAX +
         techDebtDelta / STAT_MAX +
@@ -1419,7 +1419,7 @@ function GameBoard() {
     // eligible while nothing's currently blurred, though: refreshing an
     // already-running blur wastes the turn for (at best) a few extra turns of the
     // same effect, so it drops back to the tiers below until the current one lapses.
-    const eligibleBlur = handEntries.filter((e) => e.card.action === 'blur' && blurTurnsRemaining === 0)
+    const eligibleBlur = handEntries.filter((e) => e.card.action === 'Blur' && blurTurnsRemaining === 0)
 
     // An eliminate card with something in hand eligible to eliminate takes
     // priority over raw damage — shutting down an active player recurring card
@@ -1429,7 +1429,7 @@ function GameBoard() {
     // eliminate (permanently stopping a recurring card beats temporarily pausing
     // one, when both are available).
     const eligibleEliminate = handEntries.filter(
-      (e) => e.card.action === 'eliminate' && hasEligiblePlayerRecurringTarget(e.card.category),
+      (e) => e.card.action === 'Eliminate' && hasEligiblePlayerRecurringTarget(e.card.category),
     )
     const eligibleBlock = handEntries.filter((e) => hasEligibleBlockTarget(e.card))
     const pool =
@@ -1544,7 +1544,7 @@ function GameBoard() {
       // would have cost the player becomes a gain instead (and vice versa). A
       // reversed manager card also never gets registered as a recurring effect below
       // — countering it cancels it outright, not just for this turn.
-      const reversed = activePlayerCard.action === 'reversal'
+      const reversed = activePlayerCard.action === 'Reversal'
       const negateClearable = (v: number | '*' | undefined) => (v === undefined || v === '*' ? v : -v)
 
       // A 'cancel' card neutralizes the manager's card this same round outright — no
@@ -1552,14 +1552,14 @@ function GameBoard() {
       // flipping its sign (that's what 'reversal' does) or stopping a later round
       // (that's 'eliminate', which targets a recurring effect, not the played card
       // itself).
-      const cancelled = activePlayerCard.action === 'cancel'
+      const cancelled = activePlayerCard.action === 'Cancel'
 
       // A 'character'-action card is also recurring — once played, its own stat
       // deltas (if any) keep reapplying every turn just like a plain 'recurring'
       // card, alongside introducing the character (see revealedCharacters below).
-      const playerIsRecurring = activePlayerCard.action === 'recurring' || activePlayerCard.action === 'character'
+      const playerIsRecurring = activePlayerCard.action === 'Recurring' || activePlayerCard.action === 'Character'
       const managerIsRecurring =
-        (activeManagerCard.action === 'recurring' || activeManagerCard.action === 'character') &&
+        (activeManagerCard.action === 'Recurring' || activeManagerCard.action === 'Character') &&
         !reversed &&
         !cancelled
 
@@ -1570,13 +1570,13 @@ function GameBoard() {
       // stat ('techDebt' or 'backlog'); omitting `target` clears both, same as before
       // targeted resets existed.
       const resetTargets = (card: PlayerCard | ManagerCard) =>
-        card.action === 'reset' ? (card.target?.kind === 'stat' ? card.target.stat : null) : undefined
+        card.action === 'Reset' ? (card.target?.kind === 'Stat' ? card.target.stat : null) : undefined
       const playerResetTarget = resetTargets(activePlayerCard)
       const managerResetTarget = !reversed && !cancelled ? resetTargets(activeManagerCard) : undefined
-      const resetSentinelFor = (stat: 'backlog' | 'techDebt'): '*' | undefined =>
+      const resetSentinelFor = (stat: 'Backlog' | 'Tech Debt'): '*' | undefined =>
         [playerResetTarget, managerResetTarget].some((t) => t === null || t === stat) ? '*' : undefined
-      const backlogResetSentinel = resetSentinelFor('backlog')
-      const techDebtResetSentinel = resetSentinelFor('techDebt')
+      const backlogResetSentinel = resetSentinelFor('Backlog')
+      const techDebtResetSentinel = resetSentinelFor('Tech Debt')
 
       // An 'eliminate' card stops the most recent still-active OPPOSING-side recurring
       // effect of the same type (searched before this round's own effects are pushed
@@ -1599,15 +1599,15 @@ function GameBoard() {
       // from the plain STOPPED one above.
       const findEliminatedCharacterRoundIds = (
         targetSide: 'player' | 'manager',
-        target: Extract<CardTarget, { kind: 'character' }>,
+        target: Extract<CardTarget, { kind: 'Character' }>,
       ) => {
         const plays = characterPlays.current[targetSide]
         const matches: { character: string; roundId: string }[] =
-          target.selector === 'all'
+          target.selector === 'All'
             ? plays.splice(0, plays.length)
             : (() => {
                 const index =
-                  target.selector === 'last'
+                  target.selector === 'Last'
                     ? plays.length - 1
                     : plays.findLastIndex((p) => p.character.toLowerCase() === target.name.toLowerCase())
                 return index < 0 ? [] : plays.splice(index, 1)
@@ -1621,15 +1621,15 @@ function GameBoard() {
         // eliminate-character card at exactly this "current drop" case).
         const currentRoundCard = targetSide === 'player' ? activePlayerCard : cancelled ? undefined : activeManagerCard
         const currentRoundCharacter =
-          currentRoundCard?.action === 'character' && currentRoundCard.character
+          currentRoundCard?.action === 'Character' && currentRoundCard.character
             ? currentRoundCard.character
             : undefined
         let snipedCurrentRound = false
         if (
           currentRoundCharacter &&
-          (target.selector === 'all' ||
-            (target.selector === 'last' && matches.length === 0) ||
-            (target.selector === 'named' &&
+          (target.selector === 'All' ||
+            (target.selector === 'Last' && matches.length === 0) ||
+            (target.selector === 'Named' &&
               matches.length === 0 &&
               currentRoundCharacter.toLowerCase() === target.name.toLowerCase()))
         ) {
@@ -1659,9 +1659,9 @@ function GameBoard() {
         eliminatingCard: PlayerCard | ManagerCard,
         targetSide: 'player' | 'manager',
       ): { roundIds: string[]; eliminated: boolean; snipedCurrentRound: boolean } => {
-        if (eliminatingCard.action !== 'eliminate')
+        if (eliminatingCard.action !== 'Eliminate')
           return { roundIds: [], eliminated: false, snipedCurrentRound: false }
-        if (eliminatingCard.target?.kind === 'character') {
+        if (eliminatingCard.target?.kind === 'Character') {
           const { roundIds, snipedCurrentRound } = findEliminatedCharacterRoundIds(targetSide, eliminatingCard.target)
           return { roundIds, eliminated: true, snipedCurrentRound }
         }
@@ -1693,7 +1693,7 @@ function GameBoard() {
         side: 'player' | 'manager',
         neutralized: boolean,
       ) => {
-        if (neutralized || card.effect !== 'block recurring' || card.target?.kind !== 'category') return
+        if (neutralized || card.effect !== 'Block Recurring' || card.target?.kind !== 'Category') return
         const targetSide = side === 'player' ? 'manager' : 'player'
         for (const effect of activeRecurringEffects.current) {
           if (effect.stopped) continue
@@ -1715,7 +1715,7 @@ function GameBoard() {
       // never took effect, so it can't start (or refresh) a blur; otherwise the
       // existing countdown just ticks down by one, same idea as the suspension
       // countdown below.
-      if (activeManagerCard.action === 'blur' && !cancelled && !reversed) {
+      if (activeManagerCard.action === 'Blur' && !cancelled && !reversed) {
         setBlurTurnsRemaining(activeManagerCard.duration ?? Infinity)
       } else {
         setBlurTurnsRemaining((prev) => Math.max(0, prev - 1))
@@ -1800,7 +1800,7 @@ function GameBoard() {
       // nor does one the opposing side's eliminate-character card sniped this same
       // round (see findEliminatedCharacterRoundIds' snipedCurrentRound).
       if (
-        activePlayerCard.action === 'character' &&
+        activePlayerCard.action === 'Character' &&
         activePlayerCard.character &&
         !managerElimination.snipedCurrentRound
       ) {
@@ -1808,7 +1808,7 @@ function GameBoard() {
         characterPlays.current.player.push({ character: activePlayerCard.character, roundId })
       }
       if (
-        activeManagerCard.action === 'character' &&
+        activeManagerCard.action === 'Character' &&
         !cancelled &&
         activeManagerCard.character &&
         !playerElimination.snipedCurrentRound

@@ -1,7 +1,7 @@
 {
   "title": "All Nighter",
-  "category": "coding",
-  "action": "one time",
+  "category": "Coding",
+  "action": "One Time",
   "description": "Six energy drinks and a broken circadian rhythm later, the backlog's looking better - you are not.",
   "backlog": -25,
   "techDebt": 40,

@@ -1,7 +1,7 @@
 {
   "title": "Scope Creep",
   "category": "Management",
-  "action": "one time",
+  "action": "One Time",
   "description": "Add 3 sub-tasks to the current directive.",
   "backlog": 80,
   "techDebt": 30,

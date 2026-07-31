@@ -2,9 +2,9 @@
   "title": "CFO",
   "category": "Management",
   "type" : "Character",
-  "action": "character",
+  "action": "Character",
   "character" : "CFO",
   "description": "The boss brings in the CFO to cut expenses.",
-  "effect" : "recurring",
+  "effect" : "Recurring",
   "burnout" : 15
 }

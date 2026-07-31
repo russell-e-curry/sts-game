@@ -4,7 +4,7 @@
   "type" : "Recurring",
   "character" : "Consultants",
   "description": "More sprints equals more producitivity, the consultants suggest you move your sprints to two hours instead of two weeks.",
-  "action" : "recurring",
+  "action" : "Recurring",
   "backlog" : 5,
   "techDebt" : 5
 

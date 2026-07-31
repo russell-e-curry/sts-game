@@ -2,8 +2,8 @@
   "title": "CMO",
   "category": "Management",
   "type" : "Character",
-  "action": "character",
-  "character" : "cmo",
+  "action": "Character",
+  "character" : "CMO",
   "description": "The boss hires a Chief Marketing Officer, who immediately starts expensing 'team offsites'.",
   "burnout": 10
 }

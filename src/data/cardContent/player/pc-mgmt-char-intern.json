@@ -1,8 +1,8 @@
 {
   "title": "Hire an Intern",
   "category": "Management",
-  "type" : "character",
-  "action": "character",
+  "type" : "Character",
+  "action": "Character",
   "character" : "Intern",
   "description": "No budget, no problem - this guy will work for free. He'll come to regret it but not before he clears some tickets.",
   "backlog" : -5,

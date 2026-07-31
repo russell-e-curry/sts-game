@@ -1,7 +1,7 @@
 {
   "title": "Async Standup",
-  "category": "meetings",
-  "action": "one time",
+  "category": "Meetings",
+  "action": "One Time",
   "description": "Draw 1 card.",
   "backlog": 30,
   "burnout": -5

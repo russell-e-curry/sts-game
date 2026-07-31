@@ -1,7 +1,7 @@
 {
   "title": "Stock Options Grant",
   "category": "Management",
-  "action": "one time",
+  "action": "One Time",
   "description": "A global equity refresh spreads the option pool across a thousand new hires nobody's met. Your slice just got smaller — congrats on the growth.",
   "burnout": 20,
   "vesting": -10

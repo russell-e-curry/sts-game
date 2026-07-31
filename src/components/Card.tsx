@@ -14,23 +14,17 @@ interface CardProps<T extends GameCard> {
   forceExpanded?: boolean
   /** True once this card has resolved and moved into the battle history — only then does a recurring card start its glow animation. */
   played?: boolean
-  /** True once an 'eliminate' card of the same type has stopped this recurring card — renders a striped overlay and suppresses the recurring glow. */
+  /** True once an 'Eliminate' card of the same type has stopped this recurring card — renders a striped overlay and suppresses the recurring glow. */
   stopped?: boolean
-  /** True once an 'eliminate' card with a `{ kind: 'character' }` target has taken this card down — either it's the character card itself or a recurring card attributed to that character. Renders the ELIMINATED overlay instead of `stopped`'s STOPPED one. */
+  /** True once an 'Eliminate' card with a `{ kind: 'Character' }` target has taken this card down — either it's the character card itself or a recurring card attributed to that character. Renders the ELIMINATED overlay instead of `stopped`'s STOPPED one. */
   eliminated?: boolean
-  /** True once a 'cancel' card played the same round has neutralized this card — renders a striped overlay, same idea as `stopped` but from a same-round cancel rather than a later-round eliminate. */
+  /** True once a 'Cancel' card played the same round has neutralized this card — renders a striped overlay, same idea as `stopped` but from a same-round cancel rather than a later-round eliminate. */
   cancelled?: boolean
-  /** Turns left that a 'block recurring' card has suspended this recurring card for — renders a striped overlay (and the countdown) and pauses the recurring glow, same idea as `stopped` but temporary rather than permanent. Undefined/0 means not suspended. */
+  /** Turns left that a 'Block Recurring' card has suspended this recurring card for — renders a striped overlay (and the countdown) and pauses the recurring glow, same idea as `stopped` but temporary rather than permanent. Undefined/0 means not suspended. */
   suspendedTurns?: number
-  /** Turns left that a manager 'blur' card has this card's face out of focus for — renders it unreadable (without hiding its position/shape) plus a "HUNG OVER" overlay counting down the same duration, same idea as `suspendedTurns` but board-wide rather than tied to one recurring effect. Undefined/0 means not blurred. Doesn't affect interaction (dragging/playing still works). */
+  /** Turns left that a manager 'Blur' card has this card's face out of focus for — renders it unreadable (without hiding its position/shape) plus a "HUNG OVER" overlay counting down the same duration, same idea as `suspendedTurns` but board-wide rather than tied to one recurring effect. Undefined/0 means not blurred. Doesn't affect interaction (dragging/playing still works). */
   blurredTurns?: number
   onPointerDown?: (e: PointerEvent, card: T) => void
-}
-
-// Display labels for a targeted 'reset' card's `target.stat` (see CardBase.target).
-const RESET_TARGET_LABELS: Record<string, string> = {
-  techDebt: 'Tech Debt',
-  backlog: 'Backlog',
 }
 
 // Every card enlarges to the same absolute size, pinned to what a played (battle-slot)
@@ -191,7 +185,7 @@ function Card<T extends GameCard>({
   return (
     <div
       ref={rootRef}
-      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'recurring' && played && !stopped && !eliminated && !cancelled && !suspended ? ' game-card-recurring' : ''}${blurred ? ' game-card-blurred' : ''}`}
+      className={`game-card${dimmed ? ' game-card-dimmed' : ''}${locked ? ' game-card-locked' : ''}${expanded ? ' game-card-hovered' : ''}${styledAsOverlay ? ' game-card-overlay' : ''}${card.action === 'Recurring' && played && !stopped && !eliminated && !cancelled && !suspended ? ' game-card-recurring' : ''}${blurred ? ' game-card-blurred' : ''}`}
       style={style}
       onPointerDown={onPointerDown ? (e) => onPointerDown(e, card) : undefined}
       onMouseEnter={handleMouseEnter}
@@ -222,9 +216,9 @@ function Card<T extends GameCard>({
             {card.description}
           </p>
         </div>
-        {card.action !== 'reset' && card.action !== 'cancel' && card.action !== 'blur' && (
+        {card.action !== 'Reset' && card.action !== 'Cancel' && card.action !== 'Blur' && (
           <div className="game-card-footer">
-            {card.action === 'reversal' ? (
+            {card.action === 'Reversal' ? (
               <span className="game-card-stat game-card-stat-color-vesting">Reverse manager's card</span>
             ) : (
               <>
@@ -254,12 +248,12 @@ function Card<T extends GameCard>({
             )}
           </div>
         )}
-        {card.action === 'eliminate' && (
+        {card.action === 'Eliminate' && (
           <div className="game-card-eliminate-badge">
-            {card.target?.kind === 'character'
-              ? card.target.selector === 'last'
+            {card.target?.kind === 'Character'
+              ? card.target.selector === 'Last'
                 ? 'Eliminate a Character'
-                : card.target.selector === 'all'
+                : card.target.selector === 'All'
                   ? 'Eliminate All Characters'
                   : `Eliminate ${card.target.name.toUpperCase()}`
               : card.character
@@ -267,18 +261,16 @@ function Card<T extends GameCard>({
                 : 'Stop a Recurring Card'}
           </div>
         )}
-        {card.action === 'reset' &&
-          (card.target?.kind === 'stat' ? (
-            <div className="game-card-reset-target-badge">
-              Reset {RESET_TARGET_LABELS[card.target.stat] ?? card.target.stat}
-            </div>
+        {card.action === 'Reset' &&
+          (card.target?.kind === 'Stat' ? (
+            <div className="game-card-reset-target-badge">Reset {card.target.stat}</div>
           ) : (
             <div className="game-card-reset-badge">Reset Tech Debt & Backlog</div>
           ))}
-        {card.action === 'cancel' && (
+        {card.action === 'Cancel' && (
           <div className="game-card-cancel-badge">Cancel Manager's Card</div>
         )}
-        {card.action === 'blur' && (
+        {card.action === 'Blur' && (
           <div className="game-card-blur-badge">
             Blurry Vision{card.duration ? ` (${card.duration} Turn${card.duration === 1 ? '' : 's'})` : ''}
           </div>

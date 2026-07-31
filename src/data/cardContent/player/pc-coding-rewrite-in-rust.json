@@ -1,7 +1,7 @@
 {
   "title": "Rewrite in Rust",
-  "category": "coding",
-  "action": "one time",
+  "category": "Coding",
+  "action": "One Time",
   "description": "It won't do shit, but at least you'll make the front page of Hacker News",
   "backlog": 150,
   "techDebt": 50,

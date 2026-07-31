@@ -1,7 +1,7 @@
 {
   "title": "Push up Ship Date",
   "category": "Management",
-  "action": "one time",
+  "action": "One Time",
   "description": "After a three martini lunch, your CMO convinces management to accelerate the ship date.",
   "techDebt": 50,
   "burnout": 25

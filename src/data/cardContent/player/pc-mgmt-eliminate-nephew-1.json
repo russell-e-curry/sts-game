@@ -1,7 +1,7 @@
 {
   "title": "Team Lunch",
   "category": "Management",
-  "action": "eliminate",
-  "target": { "kind": "character", "selector": "named", "name": "Boss' Nephew" },
+  "action": "Eliminate",
+  "target": { "kind": "Character", "selector": "Named", "name": "Boss' Nephew" },
   "description": "Take the boss' nephew out for gas station sushi, or as you like to call it \"sashimi roulette\". too bad you filled up on bread."
 }

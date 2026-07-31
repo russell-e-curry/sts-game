@@ -1,0 +1,8 @@
+{
+  "title": "Team Building",
+  "category": "Management",
+  "type" : "Eliminate",
+  "action": "Eliminate",
+  "target" : { "kind": "Character", "selector": "Named", "name": "Web Developer" },
+  "description": "The problem with carnival rides? They're assembled by carnies. Looks like you'll be needing a new web developer."
+}

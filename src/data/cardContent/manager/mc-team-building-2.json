@@ -1,7 +1,7 @@
 {
   "title": "Team Building",
   "category": "Management",
-  "action": "one time",
+  "action": "One Time",
   "description": "Not the best place for a selfie. Your team loses its QA lead.",
   "techDebt": 100,
   "backlog" : 50

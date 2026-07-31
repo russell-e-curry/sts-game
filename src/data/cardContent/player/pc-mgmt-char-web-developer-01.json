@@ -1,8 +1,8 @@
 {
   "title": "Web Developer",
   "category": "Management",
-  "action": "character",
-  "character": "web developer",
+  "action": "Character",
+  "character": "Web Developer",
   "description": "Your team gains a new web developer. You put him to work on tech debt.",
   "techDebt": -10,
   "burnout": -10

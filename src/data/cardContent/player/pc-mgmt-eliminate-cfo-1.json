@@ -2,7 +2,7 @@
   "title": "Santa Clause",
   "type" : "Eliminate",
   "category": "Management",
-  "action": "eliminate",
-  "target": { "kind": "character", "selector": "named", "name": "CFO" },
+  "action": "Eliminate",
+  "target": { "kind": "Character", "selector": "Named", "name": "CFO" },
   "description": "You get a great deal on a fresh cut christmas tree. The CFO gets a free raccon."
 }
