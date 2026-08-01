@@ -1,9 +1,9 @@
 {
-  "title": "Cloud Integration",
+  "title": "Project SnackNet",
   "category": "Coding",
   "type" : "Recurring",
   "character" : "Consultants",
-  "description": "Nothing says successful startup like cloud-integrated vending machines. It's not a break room, it's an Internet of Things!",
+  "description": "We propose Project SnackNet: an enterprise-grade, cloud-native IoT integration of the vending machine in the third-floor breakroom. By bridging the analog-to-digital divide, we unlock unprecedented telemetry",
   "action" : "Recurring",
   "backlog" : 5,
   "techDebt" : 5

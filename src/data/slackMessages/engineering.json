@@ -40,6 +40,33 @@
     "conversation": true,
     "messages": [
       {
+        "character": "CFO",
+        "text": "Alright, let’s make this quick. Why exactly do I need to approve a $45,000 budget to give our vending machine a Wi-Fi connection?"
+      },
+      {
+        "character": "VP",
+        "text": "Right now the break room is a dark-site silo with zero telemetry. We aren't just connecting a vending maching to our cloud infra; we’re unlocking an enterprise-grade ecosystem."
+      },
+      {
+        "character": "PM",
+        "text": "I get it - why use cash when you can implement a decentralized, zero-trust ledger? Employees can authorize a smart-contract API via their corporate badge, seamlessly using 401(k) micro-loans for a bag of Funyuns."
+      },
+      {
+        "character": "CTO",
+        "text": "I like it, observability is key."
+      },
+      {
+        "character": "PM",
+        "text": "I'll hand it off to the DevOps guy, I don't think he does anything.",
+        "techDebt": 25,
+        "burnout": 25
+      }
+    ]
+  },
+  {
+    "conversation": true,
+    "messages": [
+      {
         "character": "Intern",
         "text": "hey uh, is it normal for the deploy pipeline to be stuck at 97% for 20 minutes"
       },

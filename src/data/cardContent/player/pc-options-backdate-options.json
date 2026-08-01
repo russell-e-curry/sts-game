@@ -1,0 +1,8 @@
+{
+  "title": "Backdate your Options",
+  "category": "Options",
+  "action": "One Time",
+  "playableAgainst": ["*"],
+  "description": "Oops, you accidentally forwarded HR this virus. Funny how it backdated your option grants.",
+  "vesting": 15
+}
