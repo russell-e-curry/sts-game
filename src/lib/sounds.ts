@@ -11,6 +11,7 @@ export type SoundName =
   | 'mc-action-flip-card'
   | 'pc-action-flip-card'
   | 'gm-action-player-discard'
+  | 'gm-action-manager-discard'
   | 'gm-action-slack-message'
   | 'gm-action-meter-up'
   | 'gm-action-meter-full'

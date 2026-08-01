@@ -13,6 +13,7 @@ import Hand from './Hand'
 import Card from './Card'
 import DiscardZone from './DiscardZone'
 import DisintegrateEffect from './DisintegrateEffect'
+import ManagerDisintegrateEffect from './ManagerDisintegrateEffect'
 import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
 import SplashScreen from './SplashScreen'
 import GameOverScreen from './GameOverScreen'
@@ -52,6 +53,11 @@ interface DiscardEffect {
   rect: Rect
 }
 
+interface ManagerDiscardEffect {
+  key: number
+  rect: Rect
+}
+
 interface ManagerDrawFlight {
   key: number
   slotId: string
@@ -83,6 +89,10 @@ const PLAYER_FLIP_SOUND_DELAY_MS = 200
 // Matches .disintegrate-card's CSS animation duration (see DisintegrateEffect.css) —
 // how long a discarded card dissolves before its replacement starts drawing in.
 const DISCARD_DISINTEGRATE_DURATION_MS = 650
+// Safety cap on discardAndRedrawManagerCard's discard-then-retry chain — stops it
+// from looping forever in the (practically impossible, given deck composition)
+// case where every fresh redraw keeps landing on another unplayable card.
+const MAX_MANAGER_REDRAW_ATTEMPTS = 8
 // Gap between one meter's flash+sound landing and the next meter's turn starting in
 // the round-resolve cascade below — long enough for .meter-bar-fill's own 0.5s width
 // transition to finish before the next bar starts moving.
@@ -104,6 +114,11 @@ const VESTING_PER_TURN = 1
 // The player's first discard in a round costs this much Burnout; each further
 // discard that same round doubles it (5, 10, 20, ...) — see discardStreak.
 const DISCARD_BASE_BURNOUT_COST = 5
+// Same doubling idea as DISCARD_BASE_BURNOUT_COST, but the other way round: the
+// manager discarding into a dead hand (see discardAndRedrawManagerCard) hands the
+// player a Burnout break instead of a cost — 10 off on its first discard this turn,
+// doubling with each further one (10, 20, 40, ...) — see managerDiscardStreak.
+const MANAGER_DISCARD_BASE_BURNOUT_RELIEF = 10
 // These match .game-board/.row-top/.row-middle/.row-bottom's gap/padding in
 // GameBoard.css — read by the cardScale effect below to figure out how much width
 // each row actually has once the board's own gaps/padding are accounted for, and how
@@ -240,6 +255,7 @@ function GameBoard() {
   const [playerFlight, setPlayerFlight] = useState<PlayerFlight | null>(null)
   const [managerDrawFlight, setManagerDrawFlight] = useState<ManagerDrawFlight | null>(null)
   const [discardEffect, setDiscardEffect] = useState<DiscardEffect | null>(null)
+  const [managerDiscardEffect, setManagerDiscardEffect] = useState<ManagerDiscardEffect | null>(null)
   // Briefly shown in the active column's player slot when a locked card is dropped
   // there — cleared by lockMessageTimer below after a few seconds.
   const [lockMessage, setLockMessage] = useState<string | null>(null)
@@ -257,6 +273,19 @@ function GameBoard() {
   // 20, ...), so idly cycling the hand gets punishing fast. Reset to 0 whenever a new
   // round starts (see the roundKey effect below).
   const [discardStreak, setDiscardStreak] = useState(0)
+  // Same idea as discardStreak, but for the manager's own discard-and-redraw (see
+  // discardAndRedrawManagerCard) — also doubles the case for MAX_MANAGER_REDRAW_ATTEMPTS
+  // to cap on, since by the time it would fire again after several redraws it's
+  // certainly reading current state rather than a stale one (see managerRetryTick).
+  // Reset to 0 whenever the manager is freshly handed the turn (the two round-trigger
+  // effects below, and startNewGame).
+  const [managerDiscardStreak, setManagerDiscardStreak] = useState(0)
+  // Bumped by discardAndRedrawManagerCard once its redraw lands, so the retry effect
+  // below picks autoPlayManagerCard back up with this render's own fresh closure
+  // (current managerHand/backlog/techDebt/managerDiscardStreak/etc.) instead of the
+  // closure captured back when the original discard fired — which, by the time a
+  // redraw's animation finishes, may already be several state updates stale.
+  const [managerRetryTick, setManagerRetryTick] = useState(0)
   // Bumped independently for whichever meter just updated (see the round-resolve
   // effect below, which flashes/updates the four one at a time) — passed to Meters as
   // a remount key for that meter's flash overlay (see meter-bar-flash in Meters.css)
@@ -436,6 +465,7 @@ function GameBoard() {
   const playerDrawTimers = useRef<number[]>([])
   const managerDrawTimers = useRef<number[]>([])
   const discardTimers = useRef<number[]>([])
+  const managerDiscardTimers = useRef<number[]>([])
   // Holds the per-round timers that cascade the meter flashes one at a time and then
   // delay picking/posting the round's Slack message until a beat after the last one
   // lands (see the round-resolve effect below), so cleared on unmount/replay same as
@@ -753,6 +783,8 @@ function GameBoard() {
       managerDrawTimers.current = []
       discardTimers.current.forEach((t) => clearTimeout(t))
       discardTimers.current = []
+      managerDiscardTimers.current.forEach((t) => clearTimeout(t))
+      managerDiscardTimers.current = []
       meterSequenceTimers.current.forEach((t) => clearTimeout(t))
       meterSequenceTimers.current = []
       conversationTimers.current.forEach((t) => clearTimeout(t))
@@ -1018,6 +1050,40 @@ function GameBoard() {
     lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
   }
 
+  // An 'eliminate' + target:'character' card can only take down a character the
+  // targeted side has actually played — either still standing in the battle area
+  // (characterPlays.current[targetSide], from an earlier round) or the very card
+  // that side just dropped this round (targetSide's own active card, when it led
+  // this round) — never one that hasn't appeared at all. Shared by the manager's
+  // auto-play selection (targetSide: 'player') and the player's own drop gate
+  // (targetSide: 'manager') below. See findEliminatedCharacterRoundIds' matching
+  // `currentRoundCharacter` handling, which resolves this same "current drop" case
+  // once the card is actually played.
+  const hasEligibleCharacterTarget = (card: PlayerCard | ManagerCard, targetSide: 'player' | 'manager') => {
+    if (card.action !== 'Eliminate' || card.target?.kind !== 'Character') return true
+    const target = card.target
+    const battleArea = characterPlays.current[targetSide]
+    const targetActiveCard = targetSide === 'player' ? activePlayerCard : activeManagerCard
+    const currentDrop =
+      targetActiveCard?.action === 'Character' && targetActiveCard.character ? targetActiveCard.character : undefined
+    if (target.selector === 'All' || target.selector === 'Last') return battleArea.length > 0 || !!currentDrop
+    return (
+      battleArea.some((p) => p.character.toLowerCase() === target.name.toLowerCase()) ||
+      currentDrop?.toLowerCase() === target.name.toLowerCase()
+    )
+  }
+
+  // Shown in the active column's player slot for a few seconds, then cleared —
+  // called instead of actually playing an eliminate-character card whose target
+  // hasn't been played yet (see hasEligibleCharacterTarget/handleDropCard).
+  const showNoTargetMessage = (card: PlayerCard) => {
+    if (lockMessageTimer.current != null) window.clearTimeout(lockMessageTimer.current)
+    const who =
+      card.target?.kind === 'Character' && card.target.selector === 'Named' ? card.target.name : 'That character'
+    setLockMessage(`${who} hasn't been played yet`)
+    lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
+  }
+
   // Which manager card categories a player card is allowed to respond to —
   // defaults to only its own category (e.g. 'coding' vs 'coding') when the JSON
   // omits playableAgainst; '*' in the list allows any category (used by wellness
@@ -1055,6 +1121,10 @@ function GameBoard() {
     }
     if (!leading && !canPlayAgainst(card, activeManagerCard!)) {
       showMismatchMessage(activeManagerCard!.category)
+      return
+    }
+    if (!hasEligibleCharacterTarget(card, 'manager')) {
+      showNoTargetMessage(card)
       return
     }
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
@@ -1130,6 +1200,9 @@ function GameBoard() {
     managerDrawTimers.current = []
     discardTimers.current.forEach((t) => clearTimeout(t))
     discardTimers.current = []
+    managerDiscardTimers.current.forEach((t) => clearTimeout(t))
+    managerDiscardTimers.current = []
+    setManagerDiscardStreak(0)
     meterSequenceTimers.current.forEach((t) => clearTimeout(t))
     meterSequenceTimers.current = []
     conversationTimers.current.forEach((t) => clearTimeout(t))
@@ -1175,6 +1248,7 @@ function GameBoard() {
     setPlayerFlight(null)
     setManagerDrawFlight(null)
     setDiscardEffect(null)
+    setManagerDiscardEffect(null)
     setLockMessage(null)
     setBlurTurnsRemaining(0)
     setBacklog(0)
@@ -1342,6 +1416,66 @@ function GameBoard() {
     runLossSequence(backlog, techDebt, burnout)
   }, [backlog, techDebt, burnout, vesting, gameOver])
 
+  // Called when autoPlayManagerCard finds every card in the manager's hand either
+  // locked (see isCardLocked) or, for an eliminate-character card, with nothing
+  // eligible to target (see hasEligibleCharacterTarget) — the manager genuinely has
+  // nothing it can play this turn. Every remaining card in hand fails one of those
+  // checks in that case, so any of them is fair game: discards the first one into the
+  // manager's own dropzone (see .manager-discard-zone below), hands the player a
+  // Burnout break for it (see MANAGER_DISCARD_BASE_BURNOUT_RELIEF/managerDiscardStreak),
+  // and draws a replacement into that slot — then retries autoPlayManagerCard (via
+  // managerRetryTick) once the new card's landed. Bounded by MAX_MANAGER_REDRAW_ATTEMPTS
+  // so an (in-practice-impossible) run of unplayable redraws can't loop forever.
+  const discardAndRedrawManagerCard = () => {
+    if (managerDiscardStreak >= MAX_MANAGER_REDRAW_ATTEMPTS) return
+    const slotIndex = managerHand.findIndex((c) => c !== null)
+    if (slotIndex === -1) return
+    const id = MANAGER_SLOT_IDS[slotIndex]
+    const card = managerHand[slotIndex]!
+
+    setManagerHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
+    setUsedManagerIds((prev) => new Set(prev).add(id))
+    managerDiscard.current.push(card)
+    playSound('gm-action-manager-discard')
+
+    const relief = MANAGER_DISCARD_BASE_BURNOUT_RELIEF * 2 ** managerDiscardStreak
+    setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev - relief)))
+    setBurnoutFlashKey((k) => k + 1)
+    setManagerDiscardStreak((s) => s + 1)
+
+    // See handleDropCard's comment on why the redraw goes through the queue instead
+    // of calling startManagerDraw directly — then, once it lands, bumps managerRetryTick
+    // so the effect above gives the manager another shot at playing, with a closure
+    // that reads this redraw (and the streak/burnout updates just above) fresh rather
+    // than stale (see that effect's own comment).
+    const redrawAndRetry = () => {
+      pendingManagerDealsRef.current.push(id)
+      runManagerDealQueue(() => setManagerRetryTick((t) => t + 1))
+    }
+
+    const zoneEl = document.querySelector<HTMLElement>('.manager-discard-zone')
+    const rect = zoneEl?.getBoundingClientRect()
+    if (!rect) {
+      redrawAndRetry()
+      return
+    }
+
+    managerDiscardTimers.current.forEach((t) => clearTimeout(t))
+    managerDiscardTimers.current = []
+
+    setManagerDiscardEffect({
+      key: ++flightKeyCounter.current,
+      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+    })
+
+    managerDiscardTimers.current.push(
+      window.setTimeout(() => {
+        setManagerDiscardEffect(null)
+        redrawAndRetry()
+      }, DISCARD_DISINTEGRATE_DURATION_MS),
+    )
+  }
+
   // Picks the manager's best card in hand and flies it into the active slot — shared
   // by the two effects below: one calls this to lead the round (leader === 'manager'),
   // the other calls it to respond once the player has led instead (leader ===
@@ -1368,34 +1502,15 @@ function GameBoard() {
       )
     }
 
-    // An 'eliminate' + target:'character' card can only take down a character the
-    // player has actually played — either still standing in the battle area
-    // (characterPlays.current.player, from an earlier round) or the very card they
-    // just dropped this round (activePlayerCard, when the manager is responding
-    // rather than leading) — never one that hasn't appeared at all. See
-    // findEliminatedCharacterRoundIds' matching `currentRoundCharacter` handling,
-    // which resolves this same "current drop" case once the card is actually played.
-    const hasEligibleCharacterTarget = (c: ManagerCard) => {
-      if (c.action !== 'Eliminate' || c.target?.kind !== 'Character') return true
-      const target = c.target
-      const battleArea = characterPlays.current.player
-      const currentDrop =
-        activePlayerCard?.action === 'Character' && activePlayerCard.character
-          ? activePlayerCard.character
-          : undefined
-      if (target.selector === 'All' || target.selector === 'Last') return battleArea.length > 0 || !!currentDrop
-      return (
-        battleArea.some((p) => p.character.toLowerCase() === target.name.toLowerCase()) ||
-        currentDrop?.toLowerCase() === target.name.toLowerCase()
-      )
-    }
-
     const handEntries = managerHand
       .map((c, i) => (c ? { card: c, id: MANAGER_SLOT_IDS[i] } : null))
       .filter((entry): entry is { card: ManagerCard; id: string } => entry !== null)
       .filter((entry) => !isCardLocked(entry.card, 'manager'))
-      .filter((entry) => hasEligibleCharacterTarget(entry.card))
-    if (handEntries.length === 0) return
+      .filter((entry) => hasEligibleCharacterTarget(entry.card, 'player'))
+    if (handEntries.length === 0) {
+      discardAndRedrawManagerCard()
+      return
+    }
 
     // Normalized (percent-of-max) estimate of how much playing this card would
     // hurt the player — the higher, the more damaging. '*' and 'reset' clear a
@@ -1500,6 +1615,7 @@ function GameBoard() {
     timers.current.forEach((t) => clearTimeout(t))
     timers.current = []
     setFlight(null)
+    setManagerDiscardStreak(0)
 
     timers.current.push(window.setTimeout(autoPlayManagerCard, 500))
 
@@ -1522,6 +1638,7 @@ function GameBoard() {
     if (!gameStarted || !dealt || gameOver || leader !== 'player') return
     if (!activePlayerCard || activeManagerCard) return
 
+    setManagerDiscardStreak(0)
     timers.current.push(window.setTimeout(autoPlayManagerCard, 500))
 
     return () => {
@@ -1529,6 +1646,20 @@ function GameBoard() {
       timers.current = []
     }
   }, [activePlayerCard, activeManagerCard, leader, gameStarted, dealt, gameOver])
+
+  // Re-attempts autoPlayManagerCard once discardAndRedrawManagerCard's redraw lands
+  // (see managerRetryTick) — routed through its own effect rather than having
+  // discardAndRedrawManagerCard call autoPlayManagerCard directly, so the closure
+  // that actually runs is grabbed fresh from this render (current managerHand,
+  // managerDiscardStreak, backlog, etc.) instead of the one captured back when the
+  // original discard fired, which by the time the redraw animation finishes has
+  // already gone through several state updates. managerRetryTick starting at 0 and
+  // only ever being bumped (never reset) means the initial-mount run is always a
+  // no-op skip here, with no extra guard needed.
+  useEffect(() => {
+    if (managerRetryTick === 0 || !gameStarted || !dealt || gameOver) return
+    timers.current.push(window.setTimeout(autoPlayManagerCard, 300))
+  }, [managerRetryTick])
 
   // Once the player responds to the manager's card, resolve the round after the
   // sparkle-burst animation plays out.
@@ -2000,7 +2131,12 @@ function GameBoard() {
   }, [activePlayerCard, activeManagerCard])
 
   const lockedCardIds = new Set(
-    hand.filter((c): c is PlayerCard => c !== null && isCardLocked(c, 'player')).map((c) => c.id),
+    hand
+      .filter(
+        (c): c is PlayerCard =>
+          c !== null && (isCardLocked(c, 'player') || !hasEligibleCharacterTarget(c, 'manager')),
+      )
+      .map((c) => c.id),
   )
 
   return (
@@ -2031,6 +2167,11 @@ function GameBoard() {
                 ids={MANAGER_SLOT_IDS.slice(0, managerHand.length)}
                 usedIds={usedManagerIds}
                 hiddenId={hiddenHandId}
+              />
+            </div>
+            <div className="discard-column manager-discard-zone">
+              <DiscardZone
+                burnoutDelta={-(MANAGER_DISCARD_BASE_BURNOUT_RELIEF * 2 ** managerDiscardStreak)}
               />
             </div>
           </div>
@@ -2095,7 +2236,7 @@ function GameBoard() {
         </div>
 
         <div className="discard-column discard-zone">
-          <DiscardZone burnoutCost={DISCARD_BASE_BURNOUT_COST * 2 ** discardStreak} />
+          <DiscardZone burnoutDelta={DISCARD_BASE_BURNOUT_COST * 2 ** discardStreak} />
         </div>
       </div>
 
@@ -2168,6 +2309,10 @@ function GameBoard() {
 
       {discardEffect && (
         <DisintegrateEffect key={discardEffect.key} card={discardEffect.card} rect={discardEffect.rect} />
+      )}
+
+      {managerDiscardEffect && (
+        <ManagerDisintegrateEffect key={managerDiscardEffect.key} rect={managerDiscardEffect.rect} />
       )}
 
       {managerDrawFlight && (

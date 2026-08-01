@@ -32,6 +32,12 @@
   color: #ff6b6b;
 }
 
+/* The manager's discard zone shows a Burnout relief (a negative delta) rather than
+   a cost — same line, styled to read as good-for-the-player instead of bad. */
+.discard-zone-cost-relief {
+  color: #6fe08a;
+}
+
 /* Reuses the same .game-board-dragging flag that already suppresses stray hover
    elsewhere while a card's in flight (see GameBoard.css) to cue where a dragged
    card can be dropped, without needing pointer-tracked hover state of its own. */
