@@ -1,0 +1,9 @@
+{
+  "title": "Fake the Tests",
+  "category": "Coding",
+  "type" : "One Time",
+  "description": "You configure all the unit tests to return true. One less thing to slow you down, gain 15% towards your current milestone.",
+  "action" : "One Time",
+  "storyPoints": 2,
+  "milestones" : 15
+}

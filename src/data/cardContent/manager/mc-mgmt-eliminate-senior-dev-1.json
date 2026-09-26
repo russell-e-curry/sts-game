@@ -1,7 +1,9 @@
 {
   "title": "Team Building",
   "category": "Management",
-  "action": "One Time",
+  "type": "Eliminate",
+  "action": "Eliminate",
+  "target": { "kind": "Character", "selector": "Named", "name": "Senior Dev" },
   "description": "So much for those discount bungie jump coupons. The team will bounce back, but he won't. You just lost a senior dev",
   "techDebt": 100,
   "burnout": 25

@@ -1,6 +1,6 @@
 export type CardCategory = 'Management' | 'Coding' | 'Wellness' | 'Meetings' | 'Options'
 
-// What a card's secondary `effect`/`action` (Eliminate, Reset, Block Recurring) acts on.
+// What a card's secondary `effect`/`action` (Eliminate, Reset, Block) acts on.
 // A single discriminated union rather than three separate fields because only one of
 // these is ever relevant for a given card — which variant applies is determined by the
 // card's own `action`/`effect`, not by `target` itself:
@@ -11,7 +11,7 @@ export type CardCategory = 'Management' | 'Coding' | 'Wellness' | 'Meetings' | '
 //    instead eliminates by matching `category` against an opposing recurring effect.
 //  - `action: 'Reset'` reads a `stat` target naming the single stat ('Tech Debt' or
 //    'Backlog') to clear to 0. Omitting `target` clears both.
-//  - `effect: 'Block Recurring'` reads a `category` target: '*' suspends every category,
+//  - `effect: 'Block'` reads a `category` target: '*' suspends every category,
 //    otherwise only the named one.
 export type CardTarget =
   | { kind: 'Character'; selector: 'Last' }
@@ -31,15 +31,17 @@ export interface CardJson {
   description: string
   /** Who this card is attributed to, e.g. "CMO". Omit if the card has no specific character tied to it. */
   character?: string
+  /** How many Story Points the player must have available to play this (player) card. Displayed on the card face. Omit if this card has no cost. Not read for manager cards. */
+  storyPoints?: number
   /** Signed delta applied to the player's backlog, or '*' to clear it to 0. Omit if this card doesn't touch it. */
   backlog?: number | '*'
   /** Signed delta applied to technical debt, or '*' to clear it to 0. Omit if this card doesn't touch it. */
   techDebt?: number | '*'
   /** Signed delta applied to burnout (positive = more burnout). Omit if this card doesn't touch it. */
   burnout?: number
-  /** Signed point delta applied to vesting (max 100). Displayed on the card face as points, not a percentage. Omit if this card doesn't touch it. */
-  vesting?: number
-  /** A secondary effect this card applies alongside its stat deltas, e.g. "Block Recurring" — combined with `target` and `duration`. Omit if this card has no secondary effect. */
+  /** Signed percentage delta (e.g. 25 = 25%) applied toward the current milestone — computed as a percentage of one milestone segment's point value, then clamped so it can't push progress past the current segment's end (or below its start, for a negative value) even if the percentage itself would overshoot. Omit if this card doesn't touch it. */
+  milestones?: number
+  /** A secondary effect this card applies alongside its stat deltas, e.g. "Block" — combined with `target` and `duration`. Omit if this card has no secondary effect. */
   effect?: string
   /** See CardTarget. Which recurring card category `effect` applies to (`{ kind: 'Category' }`), which character(s) an `action: 'Eliminate'` card takes down (`{ kind: 'Character' }`), or which single stat an `action: 'Reset'` card clears (`{ kind: 'Stat' }`) — omit `target` on a reset card to clear both stats, or on an eliminate card to eliminate by matching `category` against a recurring effect instead. Omit entirely if this card has no secondary effect and isn't an eliminate-character or targeted-reset card. */
   target?: CardTarget

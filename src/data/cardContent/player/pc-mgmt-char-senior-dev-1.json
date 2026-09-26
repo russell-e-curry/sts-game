@@ -1,0 +1,10 @@
+{
+  "title": "Senior Dev",
+  "category": "Management",
+  "type" : "Character",
+  "action": "Character",
+  "character": "Senior Dev",
+  "description": "A senior dev joins your team. Tech debt doesn't stand a chance.",
+  "techDebt": -15,
+  "burnout" : -5
+}

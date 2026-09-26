@@ -27,8 +27,9 @@
 
 .discard-zone-cost {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
+  text-transform: uppercase;
   color: #ff6b6b;
 }
 

@@ -5,5 +5,6 @@
   "playableAgainst": ["*"],
   "description": "Ah, a few days off in the great outdoors. Also, your dog brought you this bear.",
   "burnout": -50,
-  "vesting": 100
+  "storyPoints": 4,
+  "milestones": 100
 }

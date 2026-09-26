@@ -4,7 +4,7 @@ import type { CardTarget } from '../data/cardContent/schema'
 import { sampleHand } from '../data/cards'
 import { sampleManagerCards } from '../data/managerCards'
 import { shuffle } from '../lib/shuffle'
-import { playSound, getSoundDurationMs } from '../lib/sounds'
+import { playSound, getSoundDurationMs, type SoundName } from '../lib/sounds'
 import Deck from './Deck'
 import ManagerHand from './ManagerHand'
 import Meters from './Meters'
@@ -18,7 +18,7 @@ import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
 import SplashScreen from './SplashScreen'
 import GameOverScreen from './GameOverScreen'
 import { allSlackItems, isSlackConversation, CHANNEL_ORDER } from '../data/slackChannels'
-import type { SlackMessageJson } from '../data/slackMessages/schema'
+import type { SlackMessageJson, SlackConversationMessageJson } from '../data/slackMessages/schema'
 import './GameBoard.css'
 
 interface Rect {
@@ -93,6 +93,10 @@ const DISCARD_DISINTEGRATE_DURATION_MS = 650
 // from looping forever in the (practically impossible, given deck composition)
 // case where every fresh redraw keeps landing on another unplayable card.
 const MAX_MANAGER_REDRAW_ATTEMPTS = 8
+// See autoPlayManagerCard's damage/isRecurringCard comment — the assumed number of
+// future turns a duration-less recurring/character card gets credited with when the
+// manager compares it against one-time cards.
+const RECURRING_HORIZON_TURNS = 8
 // Gap between one meter's flash+sound landing and the next meter's turn starting in
 // the round-resolve cascade below — long enough for .meter-bar-fill's own 0.5s width
 // transition to finish before the next bar starts moving.
@@ -102,15 +106,32 @@ const METER_STEP_DELAY_MS = 550
 // gm-action-meter-full's actual length loads (see the ref below), and again if it
 // never does.
 const METER_FULL_DEFAULT_DURATION_MS = 900
-// Same idea as METER_FULL_DEFAULT_DURATION_MS, but for gm-action-vesting-full's length
-// — used to time the win sequence's own hold (see runWinSequence) until that sound's
-// actual duration loads.
-const VESTING_FULL_DEFAULT_DURATION_MS = 900
+// Same idea as METER_FULL_DEFAULT_DURATION_MS, but for gm-action-win-meter-full's
+// length — used to time the win sequence's own hold (see runWinSequence) until that
+// sound's actual duration loads.
+const WIN_METER_FULL_DEFAULT_DURATION_MS = 900
 const STARTING_BURNOUT = 0
 const STAT_MAX = 500
 const BURNOUT_MAX = 1000
+// Vesting is a second, independent win path alongside Milestones below — a purely
+// passive clock (no card interaction) that climbs VESTING_PER_TURN every round on its
+// own, win the moment it reaches VESTING_MAX.
 const VESTING_MAX = 100
 const VESTING_PER_TURN = 1
+// The player's spendable Story Points resource — a card with a `storyPoints` cost can
+// only be played once this covers it (see handleDropCard). Starts at
+// STARTING_STORY_POINTS and climbs by STORY_POINTS_PER_TURN every round, same cadence
+// as Vesting above, so it (unlike Vesting) has no cap of its own.
+const STARTING_STORY_POINTS = 5
+const STORY_POINTS_PER_TURN = 1
+// Milestones are grouped into MILESTONE_COUNT sequential 100-point checkpoints rather
+// than one flat 0-400 bar: points fill milestone 1 first, then spill into milestone 2,
+// and so on — each checkpoint crossed gets its own beat (see the milestone meter step
+// below). Reaching MILESTONE_POINTS_MAX is this game's other win path, alongside
+// Vesting above — either one on its own ends the game in a win (see runWinSequence).
+const MILESTONE_POINTS_PER_MILESTONE = 100
+const MILESTONE_COUNT = 4
+const MILESTONE_POINTS_MAX = MILESTONE_POINTS_PER_MILESTONE * MILESTONE_COUNT
 // The player's first discard in a round costs this much Burnout; each further
 // discard that same round doubles it (5, 10, 20, ...) — see discardStreak.
 const DISCARD_BASE_BURNOUT_COST = 5
@@ -200,23 +221,34 @@ interface RecurringEffect {
   backlog?: number | '*'
   techDebt?: number | '*'
   burnout?: number
-  vesting?: number
+  milestones?: number
   // Set once an 'eliminate' card of the same type (or an eliminated character it's
-  // attributed to) stops it — a stopped effect stays in the list (so the battle
-  // history can still point at the round it came from, for the STOPPED/ELIMINATED
-  // overlay) but is excluded from every future delta calculation.
+  // attributed to) stops it, or once its own turnsRemaining below counts down to 0 —
+  // a stopped effect stays in the list (so the battle history can still point at the
+  // round it came from, for the STOPPED/ELIMINATED overlay) but is excluded from
+  // every future delta calculation.
   stopped: boolean
-  // Turns left that a 'block recurring' effect has suspended this effect for — set
-  // (and reset) whenever a matching block card is played against it, ticked down by
-  // one at the end of every round, and excluded from delta calculations while > 0.
-  // A card with no `duration` blocks for the rest of the game, represented here as
-  // Infinity so it decrements forever without ever reaching 0 on its own. Unlike
-  // `stopped`, this can also lapse on its own rather than lasting until eliminated.
+  // Turns left that a 'block' effect has suspended this effect for — set (and reset)
+  // whenever a matching block card is played against it, ticked down by one at the
+  // end of every round, and excluded from delta calculations while > 0. A card with
+  // no `duration` blocks for the rest of the game, represented here as Infinity so it
+  // decrements forever without ever reaching 0 on its own. Unlike `stopped`, this can
+  // also lapse on its own rather than lasting until eliminated.
   suspendedTurnsRemaining?: number
-  // roundId of the card whose 'block recurring' effect suspended this — lets an
-  // 'eliminate' + target:'character' card find and lift exactly the suspensions that
-  // character caused (see findEliminatedCharacterRoundIds) without touching unrelated blocks.
+  // roundId of the card whose 'block' effect suspended this — lets an 'eliminate' +
+  // target:'character' card find and lift exactly the suspensions that character
+  // caused (see findEliminatedCharacterRoundIds) without touching unrelated blocks.
   suspendedBy?: string
+  // Turns this effect has left on its OWN clock before it stops itself, for a
+  // recurring card that was authored with a `duration` (e.g. a 'block' effect card
+  // that's also `action: 'Recurring'`, wanting its own glow to end once its block
+  // does, rather than running for the rest of the game like an ordinary recurring
+  // card). Set from the source card's `duration` at registration, ticked down once
+  // at the end of every round the same way suspendedTurnsRemaining is, and once it
+  // reaches 0 this effect is marked `stopped` — same STOPPED overlay/delta exclusion
+  // as an opponent eliminating it, just self-inflicted on a timer. Undefined for a
+  // card with no `duration`, which (as before) runs until eliminated instead.
+  turnsRemaining?: number
 }
 
 function GameBoard() {
@@ -267,7 +299,16 @@ function GameBoard() {
   const [backlog, setBacklog] = useState(0)
   const [techDebt, setTechDebt] = useState(0)
   const [burnout, setBurnout] = useState(STARTING_BURNOUT)
+  // Climbs VESTING_PER_TURN every round on its own — see VESTING_MAX's comment.
   const [vesting, setVesting] = useState(0)
+  // The player's spendable resource for card costs — see STARTING_STORY_POINTS'
+  // comment. Spent immediately when a costed card is played (handleDropCard), climbs
+  // STORY_POINTS_PER_TURN every round alongside Vesting (see the round-resolve
+  // cascade's final step).
+  const [storyPointsAvailable, setStoryPointsAvailable] = useState(STARTING_STORY_POINTS)
+  // Total story points banked toward the current milestone run, 0-MILESTONE_POINTS_MAX
+  // — see MILESTONE_POINTS_PER_MILESTONE's comment for the checkpoint structure.
+  const [milestonePoints, setMilestonePoints] = useState(0)
   // How many cards the player has discarded so far this round — the next discard's
   // Burnout cost is DISCARD_BASE_BURNOUT_COST doubled once per prior discard (5, 10,
   // 20, ...), so idly cycling the hand gets punishing fast. Reset to 0 whenever a new
@@ -294,6 +335,13 @@ function GameBoard() {
   const [techDebtFlashKey, setTechDebtFlashKey] = useState(0)
   const [burnoutFlashKey, setBurnoutFlashKey] = useState(0)
   const [vestingFlashKey, setVestingFlashKey] = useState(0)
+  const [milestoneFlashKey, setMilestoneFlashKey] = useState(0)
+  // Bumped alongside milestoneCheckpointIndex whenever a card/round crosses a fresh
+  // 100-point line mid-game (not the final, game-winning one) — passed to Meters as a
+  // remount key for that specific segment's one-shot checkpoint glow, distinct from the
+  // plain point-gain flash every meter gets (see the milestone meter step below).
+  const [milestoneCheckpointKey, setMilestoneCheckpointKey] = useState(0)
+  const [milestoneCheckpointIndex, setMilestoneCheckpointIndex] = useState<number | null>(null)
   // Flipped true one at a time, in order, by runLossSequence once a danger stat has
   // actually maxed out — holds each meter in its bright game-over glow (see
   // meter-bar-fill-maxed in Meters.css) through the rest of the sequence and into the
@@ -301,10 +349,13 @@ function GameBoard() {
   const [backlogMaxed, setBacklogMaxed] = useState(false)
   const [techDebtMaxed, setTechDebtMaxed] = useState(false)
   const [burnoutMaxed, setBurnoutMaxed] = useState(false)
-  // Same idea as the danger-stat Maxed flags above, but for a win — flipped true by
-  // runWinSequence once vesting hits 100%, so the vesting meter gets the same bright
-  // glow through the win sequence and into the game-over fade-in.
+  // Same idea as the danger-stat Maxed flags above, but for this game's two win paths
+  // (see VESTING_MAX/MILESTONE_POINTS_MAX) — flipped true by runWinSequence once that
+  // path's meter actually completes, holding its bright glow through the rest of the
+  // win sequence and into the game-over fade-in. Either flipping is enough to win; the
+  // other can be flipped too if both complete the same round (see runWinSequence).
   const [vestingMaxed, setVestingMaxed] = useState(false)
+  const [milestonesWon, setMilestonesWon] = useState(false)
   const [roundKey, setRoundKey] = useState(0)
   // Which side plays first this round — the round-start effect only auto-plays the
   // manager's card while this is 'manager'; while it's 'player', that effect no-ops
@@ -321,7 +372,7 @@ function GameBoard() {
   // Turn" placeholder would flash back on during that gap, between the round
   // resolving and the manager's slot switching over to "Manager's Turn".
   const [playerHasLed, setPlayerHasLed] = useState(false)
-  // Set once backlog/technical debt/burnout hits its cap (lose) or vesting hits 100%
+  // Set once backlog/technical debt/burnout hits its cap (lose) or every milestone fills
   // (win) — see the effect below. Also gates the round-start effect so the manager
   // stops playing cards once the game has ended.
   const [gameOver, setGameOver] = useState<'win' | 'lose' | null>(null)
@@ -433,21 +484,22 @@ function GameBoard() {
   // Same idea again, for gm-action-meter-full's length — timing the gap between each
   // maxed meter's turn in runLossSequence's glow cascade.
   const meterFullDurationRef = useRef(METER_FULL_DEFAULT_DURATION_MS)
-  // Same idea again, for gm-action-vesting-full's length — timing runWinSequence's own
+  // Same idea again, for gm-action-win-meter-full's length — timing runWinSequence's own
   // hold before the game-over splash fades in.
-  const vestingFullDurationRef = useRef(VESTING_FULL_DEFAULT_DURATION_MS)
-  // Live mirrors of backlog/techDebt/burnout/vesting, kept current by the sync effects
-  // below — read from the round-resolve cascade's own completion point, which runs
-  // inside a chain of setTimeouts from an older render's closure, so the plain
-  // backlog/techDebt/burnout/vesting identifiers captured there are frozen at whatever
-  // they were when that round started and never see this same round's own cascade
-  // updates land.
+  const winMeterFullDurationRef = useRef(WIN_METER_FULL_DEFAULT_DURATION_MS)
+  // Live mirrors of backlog/techDebt/burnout/vesting/milestonePoints, kept current by
+  // the sync effects below — read from the round-resolve cascade's own completion
+  // point, which runs inside a chain of setTimeouts from an older render's closure, so
+  // the plain backlog/techDebt/burnout/vesting/milestonePoints identifiers captured
+  // there are frozen at whatever they were when that round started and never see this
+  // same round's own cascade updates land.
   const backlogRef = useRef(0)
   const techDebtRef = useRef(0)
   const burnoutRef = useRef(STARTING_BURNOUT)
   const vestingRef = useRef(0)
+  const milestonePointsRef = useRef(0)
   // True for the duration of the round-resolve cascade's four meter steps — gates the
-  // win/lose effect below so a danger stat (or vesting) maxing out on, say, the very
+  // win/lose effect below so a danger stat (or milestonePoints) maxing out on, say, the very
   // first step doesn't call runLossSequence/runWinSequence before the other three
   // steps have had their turn; the cascade calls them itself, explicitly, once all
   // four have landed.
@@ -745,17 +797,32 @@ function GameBoard() {
         backlog: msg.backlog,
         techDebt: msg.techDebt,
         burnout: msg.burnout,
-        vesting: msg.vesting,
+        milestones: msg.milestones,
       },
     ])
     setActiveSlackChannel(channel)
     playSound('gm-action-slack-message')
   }
 
+  // Applies a `milestones` percentage delta (from a Slack message, outside the
+  // round-resolve cascade) the same way a card's own `milestones` field does — a
+  // slice of the CURRENT 100-point segment, clamped to that segment's own [start,
+  // end) bounds (see the round-resolve cascade's own milestonesPointsDelta for why).
+  const applyMilestonesPct = (pctDelta: number) => {
+    if (!pctDelta) return
+    setMilestonePoints((prev) => {
+      const segmentStart = Math.floor(prev / MILESTONE_POINTS_PER_MILESTONE) * MILESTONE_POINTS_PER_MILESTONE
+      const segmentEnd = Math.min(MILESTONE_POINTS_MAX, segmentStart + MILESTONE_POINTS_PER_MILESTONE)
+      return Math.min(segmentEnd, Math.max(segmentStart, prev + (pctDelta / 100) * MILESTONE_POINTS_PER_MILESTONE))
+    })
+  }
+
   // Plays a conversation's messages out one at a time, 1-10s apart, applying each
   // message's own stat deltas as it lands — runs independently of the round loop, so
   // the manager and player keep playing cards against each other while it's going.
-  const runConversation = (channel: string, messages: SlackMessageJson[], index: number) => {
+  // Never touches Milestones — a conversation's messages can't carry a `milestones`
+  // delta at all (see SlackConversationMessageJson), only Backlog/Tech Debt/Burnout.
+  const runConversation = (channel: string, messages: SlackConversationMessageJson[], index: number) => {
     if (index >= messages.length) {
       conversationInProgress.current = false
       return
@@ -769,7 +836,6 @@ function GameBoard() {
         setBacklog((prev) => applyClearableDelta(prev, [msg.backlog]))
         setTechDebt((prev) => applyClearableDelta(prev, [msg.techDebt]))
         setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + (msg.burnout ?? 0))))
-        setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + (msg.vesting ?? 0))))
         runConversation(channel, messages, index + 1)
       }, delay),
     )
@@ -825,8 +891,8 @@ function GameBoard() {
 
   useEffect(() => {
     let cancelled = false
-    getSoundDurationMs('gm-action-vesting-full').then((ms) => {
-      if (!cancelled && ms != null) vestingFullDurationRef.current = ms
+    getSoundDurationMs('gm-action-win-meter-full').then((ms) => {
+      if (!cancelled && ms != null) winMeterFullDurationRef.current = ms
     })
     return () => {
       cancelled = true
@@ -845,6 +911,9 @@ function GameBoard() {
   useEffect(() => {
     vestingRef.current = vesting
   }, [vesting])
+  useEffect(() => {
+    milestonePointsRef.current = milestonePoints
+  }, [milestonePoints])
   // New round, fresh discard streak — the next discard costs DISCARD_BASE_BURNOUT_COST
   // again instead of wherever the doubling left off last round.
   useEffect(() => {
@@ -1103,6 +1172,15 @@ function GameBoard() {
     lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
   }
 
+  // Shown in the active column's player slot for a few seconds, then cleared —
+  // called instead of actually playing a card whose storyPoints cost is more than the
+  // player currently has available (see handleDropCard).
+  const showInsufficientPointsMessage = () => {
+    if (lockMessageTimer.current != null) window.clearTimeout(lockMessageTimer.current)
+    setLockMessage('Not enough Story Points to play this card')
+    lockMessageTimer.current = window.setTimeout(() => setLockMessage(null), 2800)
+  }
+
   const handleDropCard = (cardId: string) => {
     // Normally the player can only drop a card once the manager's has landed
     // (responding to it). While the player leads the round instead (see `leader`),
@@ -1119,6 +1197,10 @@ function GameBoard() {
       showLockMessage(card.character!)
       return
     }
+    if (card.storyPoints !== undefined && card.storyPoints > storyPointsAvailable) {
+      showInsufficientPointsMessage()
+      return
+    }
     if (!leading && !canPlayAgainst(card, activeManagerCard!)) {
       showMismatchMessage(activeManagerCard!.category)
       return
@@ -1129,6 +1211,7 @@ function GameBoard() {
     }
     setHand((prev) => prev.map((c, i) => (i === slotIndex ? null : c)))
     setActivePlayerCard(card)
+    if (card.storyPoints !== undefined) setStoryPointsAvailable((prev) => prev - card.storyPoints!)
     if (leading) setPlayerHasLed(true)
     playerDiscard.current.push(card)
     // Goes through the same queue a resize's growth deals use (see
@@ -1225,6 +1308,7 @@ function GameBoard() {
     techDebtRef.current = 0
     burnoutRef.current = STARTING_BURNOUT
     vestingRef.current = 0
+    milestonePointsRef.current = 0
     cascadeSettling.current = false
     resultSequenceStarted.current = false
     pendingPlayerDealsRef.current = []
@@ -1255,15 +1339,21 @@ function GameBoard() {
     setTechDebt(0)
     setBurnout(STARTING_BURNOUT)
     setVesting(0)
+    setStoryPointsAvailable(STARTING_STORY_POINTS)
+    setMilestonePoints(0)
     setDiscardStreak(0)
     setBacklogFlashKey(0)
     setTechDebtFlashKey(0)
     setBurnoutFlashKey(0)
     setVestingFlashKey(0)
+    setMilestoneFlashKey(0)
+    setMilestoneCheckpointKey(0)
+    setMilestoneCheckpointIndex(null)
     setBacklogMaxed(false)
     setTechDebtMaxed(false)
     setBurnoutMaxed(false)
     setVestingMaxed(false)
+    setMilestonesWon(false)
     setRoundKey(0)
     setLeader('manager')
     setPlayerHasLed(false)
@@ -1379,42 +1469,58 @@ function GameBoard() {
     return true
   }
 
-  // Mirrors runLossSequence above, but for the single win condition: the vesting meter
-  // gets the same bright maxed glow (see meter-bar-fill-maxed in Meters.css), though its
-  // own gm-action-vesting-full ding instead of the danger meters' gm-action-meter-full,
-  // and only once that beat has played out does the game actually end. Called
-  // explicitly once the round-resolve cascade's own four meter updates have all landed
-  // — using the live vestingRef, since that call site's plain vesting identifier is
-  // frozen mid-round (see cascadeSettling below) — and again by the win/lose effect
-  // below for vesting pushed over the line by a Slack message/conversation outside a
-  // round's own resolution. Returns whether it actually started the cascade.
-  const runWinSequence = () => {
+  // Mirrors runLossSequence above, but for this game's two independent win paths:
+  // Vesting reaching VESTING_MAX, or every Milestone filling to MILESTONE_POINTS_MAX —
+  // either one on its own wins (see VESTING_MAX/MILESTONE_POINTS_MAX's comments).
+  // Whichever actually completed gets the same bright maxed glow (see
+  // meter-bar-fill-maxed/milestone-segment-maxed in Meters.css) and
+  // gm-action-win-meter-full's ding, in Vesting / Milestones order if somehow both
+  // complete the same round, and only once every completed path has had its turn does
+  // the game actually end. Called explicitly once the round-resolve cascade's own
+  // meter updates have all landed — using the live vestingRef/milestonePointsRef,
+  // since that call site's plain state identifiers are frozen mid-round (see
+  // cascadeSettling below) — and again by the win/lose effect below for a path pushed
+  // over its line by a Slack message/conversation outside a round's own resolution.
+  // Returns whether it actually found a completed path and started the cascade.
+  const runWinSequence = (vestingComplete: boolean, milestonesComplete: boolean) => {
     if (resultSequenceStarted.current) return true
+    const won: { setGlow: (v: boolean) => void }[] = []
+    if (vestingComplete) won.push({ setGlow: setVestingMaxed })
+    if (milestonesComplete) won.push({ setGlow: setMilestonesWon })
+    if (won.length === 0) return false
+
     resultSequenceStarted.current = true
-    setVestingMaxed(true)
-    playSound('gm-action-vesting-full')
-    // Completely stops the game — the round-start/Slack-pick effects below both bail
-    // out once gameOver is set — and fades in the game-over splash, which holds off on
-    // the "you win" video until its own fade-in finishes (see GameOverScreen).
-    meterSequenceTimers.current.push(
-      window.setTimeout(() => setGameOver('win'), vestingFullDurationRef.current),
-    )
+    const runGlowStep = (index: number) => {
+      if (index >= won.length) {
+        // Completely stops the game — the round-start/Slack-pick effects below both
+        // bail out once gameOver is set — and fades in the game-over splash, which
+        // holds off on the "you win" video until its own fade-in finishes (see
+        // GameOverScreen).
+        meterSequenceTimers.current.push(
+          window.setTimeout(() => setGameOver('win'), winMeterFullDurationRef.current),
+        )
+        return
+      }
+      won[index].setGlow(true)
+      playSound('gm-action-win-meter-full')
+      meterSequenceTimers.current.push(
+        window.setTimeout(() => runGlowStep(index + 1), winMeterFullDurationRef.current),
+      )
+    }
+    runGlowStep(0)
     return true
   }
 
-  // Ends the game once vesting reaches 100% (win), or a danger stat is pushed over its
+  // Ends the game once either win path completes, or a danger stat is pushed over its
   // cap (lose), by a Slack message/conversation outside a round's own resolution —
   // gated by cascadeSettling so it doesn't preempt the round-resolve cascade's own
   // call to runWinSequence/runLossSequence (see above) mid-cascade, before every meter
   // that moved this round has actually had its turn.
   useEffect(() => {
     if (gameOver || cascadeSettling.current || resultSequenceStarted.current) return
-    if (vesting >= VESTING_MAX) {
-      runWinSequence()
-      return
-    }
+    if (runWinSequence(vesting >= VESTING_MAX, milestonePoints >= MILESTONE_POINTS_MAX)) return
     runLossSequence(backlog, techDebt, burnout)
-  }, [backlog, techDebt, burnout, vesting, gameOver])
+  }, [backlog, techDebt, burnout, vesting, milestonePoints, gameOver])
 
   // Called when autoPlayManagerCard finds every card in the manager's hand either
   // locked (see isCardLocked) or, for an eliminate-character card, with nothing
@@ -1485,13 +1591,13 @@ function GameBoard() {
     const hasEligiblePlayerRecurringTarget = (category: string) =>
       activeRecurringEffects.current.some((e) => !e.stopped && e.side === 'player' && e.category === category)
 
-    // A 'block recurring' card carries no stat deltas of its own (see the damage
+    // A 'block' effect card carries no stat deltas of its own (see the damage
     // heuristic below), so without this it would always score 0 and lose out to
     // almost anything else in hand. It's only worth playing when there's an
     // active, not-already-suspended player recurring effect it would actually
     // suspend — matching `target`, or any type for '*'.
     const hasEligibleBlockTarget = (c: ManagerCard) => {
-      if (c.effect !== 'Block Recurring' || c.target?.kind !== 'Category') return false
+      if (c.effect !== 'Block' || c.target?.kind !== 'Category') return false
       const target = c.target
       return activeRecurringEffects.current.some(
         (e) =>
@@ -1516,7 +1622,7 @@ function GameBoard() {
     // hurt the player — the higher, the more damaging. '*' and 'reset' clear a
     // stat to 0, which only helps the player, so they're scored as improving
     // (negative) that stat rather than raising it.
-    const damage = (c: ManagerCard) => {
+    const damagePerTurn = (c: ManagerCard) => {
       const backlogDelta = c.action === 'Reset' || c.backlog === '*' ? -backlog : (c.backlog ?? 0)
       const techDebtDelta =
         c.action === 'Reset' || c.techDebt === '*' ? -techDebt : (c.techDebt ?? 0)
@@ -1524,9 +1630,24 @@ function GameBoard() {
         backlogDelta / STAT_MAX +
         techDebtDelta / STAT_MAX +
         (c.burnout ?? 0) / BURNOUT_MAX -
-        (c.vesting ?? 0) / VESTING_MAX
+        (c.milestones ?? 0) / 100
       )
     }
+
+    // A 'recurring' (or 'character', which is also recurring — see the round-resolve
+    // cascade's playerIsRecurring/managerIsRecurring) card's real value is its per-turn
+    // delta compounding across every future turn it stays active, not the single round
+    // it's played — plain damagePerTurn would score a weak-but-lasting recurring card
+    // identically to an equally-sized one-time card and let the manager pass up its own
+    // best long-term threats. A duration-less recurring effect lasts the rest of the
+    // game (see CardBase.duration's comment), which has no fixed number of turns to
+    // multiply by, so this caps the assumed remaining turns at RECURRING_HORIZON_TURNS —
+    // a deliberately conservative stand-in for "however long the game still has left",
+    // high enough to make an undying recurring effect clearly outweigh a one-off of
+    // similar size without letting it dominate every other comparison outright.
+    const isRecurringCard = (c: ManagerCard) => c.action === 'Recurring' || c.action === 'Character'
+    const damage = (c: ManagerCard) =>
+      damagePerTurn(c) * (isRecurringCard(c) ? Math.min(c.duration ?? Infinity, RECURRING_HORIZON_TURNS) : 1)
 
     // A 'blur' card outranks every other consideration — the disorientation it
     // buys is worth more than any single round's stat hit or a stopped recurring
@@ -1812,19 +1933,19 @@ function GameBoard() {
         ? { roundIds: [], eliminated: false, snipedCurrentRound: false }
         : findEliminatedRoundIds(activeManagerCard, 'player')
 
-      // A 'block recurring' card suspends every still-active OPPOSING-side recurring
+      // A 'block' effect card suspends every still-active OPPOSING-side recurring
       // effect matching its `{ kind: 'category' }` target (or every category, for
       // '*') for `duration` turns — searched before this round's own recurring cards
       // are registered below, so a recurring card played this same round can never be
       // suspended by a block played alongside it. A neutralized manager card
       // (cancelled or reversed away) never took effect, so it can't suspend anything
       // either.
-      const applyBlockRecurring = (
+      const applyBlock = (
         card: PlayerCard | ManagerCard,
         side: 'player' | 'manager',
         neutralized: boolean,
       ) => {
-        if (neutralized || card.effect !== 'Block Recurring' || card.target?.kind !== 'Category') return
+        if (neutralized || card.effect !== 'Block' || card.target?.kind !== 'Category') return
         const targetSide = side === 'player' ? 'manager' : 'player'
         for (const effect of activeRecurringEffects.current) {
           if (effect.stopped) continue
@@ -1836,8 +1957,8 @@ function GameBoard() {
           effect.suspendedBy = roundId
         }
       }
-      applyBlockRecurring(activePlayerCard, 'player', false)
-      applyBlockRecurring(activeManagerCard, 'manager', cancelled || reversed)
+      applyBlock(activePlayerCard, 'player', false)
+      applyBlock(activeManagerCard, 'manager', cancelled || reversed)
 
       // A manager 'blur' card obscures the player's hand and the shared dropzone/
       // history for `duration` turns (see Card.tsx's blurred prop) — refreshes the
@@ -1875,12 +1996,21 @@ function GameBoard() {
         ]
         return next.map((r) => ({
           ...r,
+          // Also re-checked fresh against activeRecurringEffects.current every round
+          // (rather than only patched the round an elimination lands), so a card whose
+          // own turnsRemaining ran out picks up the STOPPED overlay/glow-stop the round
+          // after it happens, with no separate "just expired" bookkeeping needed — see
+          // turnsRemaining's own comment on RecurringEffect.
           managerCardStopped:
-            !managerElimination.eliminated && managerElimination.roundIds.includes(r.id)
+            (!managerElimination.eliminated && managerElimination.roundIds.includes(r.id)) ||
+            activeRecurringEffects.current.some((e) => e.side === 'manager' && e.roundId === r.id && e.stopped)
               ? true
               : r.managerCardStopped,
           playerCardStopped:
-            !playerElimination.eliminated && playerElimination.roundIds.includes(r.id) ? true : r.playerCardStopped,
+            (!playerElimination.eliminated && playerElimination.roundIds.includes(r.id)) ||
+            activeRecurringEffects.current.some((e) => e.side === 'player' && e.roundId === r.id && e.stopped)
+              ? true
+              : r.playerCardStopped,
           managerCardEliminated:
             managerElimination.eliminated && managerElimination.roundIds.includes(r.id)
               ? true
@@ -1907,8 +2037,9 @@ function GameBoard() {
           backlog: activePlayerCard.backlog,
           techDebt: activePlayerCard.techDebt,
           burnout: activePlayerCard.burnout,
-          vesting: activePlayerCard.vesting,
+          milestones: activePlayerCard.milestones,
           stopped: false,
+          turnsRemaining: activePlayerCard.duration,
         })
       }
       if (managerIsRecurring) {
@@ -1920,8 +2051,9 @@ function GameBoard() {
           backlog: activeManagerCard.backlog,
           techDebt: activeManagerCard.techDebt,
           burnout: activeManagerCard.burnout,
-          vesting: activeManagerCard.vesting,
+          milestones: activeManagerCard.milestones,
           stopped: false,
+          turnsRemaining: activeManagerCard.duration,
         })
       }
 
@@ -1969,15 +2101,15 @@ function GameBoard() {
           : reversed
             ? -(activeManagerCard.burnout ?? 0)
             : activeManagerCard.burnout ?? 0
-      const playerVesting = reversed || playerIsRecurring ? 0 : activePlayerCard.vesting ?? 0
-      const managerVesting =
+      const playerMilestonesPct = reversed || playerIsRecurring ? 0 : activePlayerCard.milestones ?? 0
+      const managerMilestonesPct =
         managerIsRecurring || cancelled
           ? 0
           : reversed
-            ? -(activeManagerCard.vesting ?? 0)
-            : activeManagerCard.vesting ?? 0
+            ? -(activeManagerCard.milestones ?? 0)
+            : activeManagerCard.milestones ?? 0
 
-      // A suspended effect (see applyBlockRecurring above) stays registered but
+      // A suspended effect (see applyBlock above) stays registered but
       // contributes nothing while its countdown is still running.
       const liveRecurringEffects = activeRecurringEffects.current.filter(
         (e) => !e.stopped && !((e.suspendedTurnsRemaining ?? 0) > 0),
@@ -1985,14 +2117,22 @@ function GameBoard() {
       const recurringBacklog = liveRecurringEffects.map((e) => e.backlog)
       const recurringTechDebt = liveRecurringEffects.map((e) => e.techDebt)
       const recurringBurnout = liveRecurringEffects.map((e) => e.burnout)
-      const recurringVesting = liveRecurringEffects.map((e) => e.vesting)
+      const recurringMilestonesPct = liveRecurringEffects.map((e) => e.milestones)
 
       // Ticks every still-suspended effect's countdown down by one now that this
       // round's SUSPENDED-overlay snapshot and delta exclusion have both already read
       // the pre-tick value — once a counter reaches 0 the effect resumes contributing
-      // from next round on.
+      // from next round on. Same idea for turnsRemaining, a recurring effect's own
+      // duration clock (see its comment on RecurringEffect) — liveRecurringEffects
+      // above already read this round's pre-tick value too, so a duration-N effect
+      // still contributes on its Nth (last) active round; once it reaches 0 here the
+      // effect is marked stopped for good, same as an opponent eliminating it.
       activeRecurringEffects.current.forEach((e) => {
         if (e.suspendedTurnsRemaining && e.suspendedTurnsRemaining > 0) e.suspendedTurnsRemaining -= 1
+        if (e.turnsRemaining !== undefined && e.turnsRemaining > 0) {
+          e.turnsRemaining -= 1
+          if (e.turnsRemaining === 0) e.stopped = true
+        }
       })
 
       setActivePlayerCard(null)
@@ -2001,12 +2141,46 @@ function GameBoard() {
       // have all had their turn (see runLossSequence's call at the cascade's end).
       cascadeSettling.current = true
 
+      // Milestone progress only ever comes from cards/messages (no passive per-turn
+      // tick — progress should feel earned) — precomputed here, before any step below
+      // has run, so the checkpoint-crossing check can compare against
+      // milestonePointsRef's current value while it's still this round's true
+      // "before" state. Milestones cards add a slice of the CURRENT 100-point segment
+      // rather than a flat amount — e.g. +25 means "25% of this segment" — clamped to
+      // that segment's own [start, end) bounds so a card can top off the rest of the
+      // segment but can never spill into the next one (or drain back into the
+      // previous one) even if the percentage itself would overshoot.
+      const milestonePrev = milestonePointsRef.current
+      const milestonesPctDelta = sumDeltas([playerMilestonesPct, managerMilestonesPct, ...recurringMilestonesPct])
+      const milestoneSegmentStart =
+        Math.floor(milestonePrev / MILESTONE_POINTS_PER_MILESTONE) * MILESTONE_POINTS_PER_MILESTONE
+      const milestoneSegmentEnd = Math.min(MILESTONE_POINTS_MAX, milestoneSegmentStart + MILESTONE_POINTS_PER_MILESTONE)
+      const milestoneDelta =
+        Math.min(
+          milestoneSegmentEnd,
+          Math.max(milestoneSegmentStart, milestonePrev + (milestonesPctDelta / 100) * MILESTONE_POINTS_PER_MILESTONE),
+        ) - milestonePrev
+      const milestoneNext = Math.min(MILESTONE_POINTS_MAX, Math.max(0, milestonePrev + milestoneDelta))
+      const milestonePrevCompleted = Math.floor(milestonePrev / MILESTONE_POINTS_PER_MILESTONE)
+      const milestoneNextCompleted = Math.min(
+        MILESTONE_COUNT,
+        Math.floor(milestoneNext / MILESTONE_POINTS_PER_MILESTONE),
+      )
+      // A positive delta that crosses a fresh 100-point line completes a milestone —
+      // that segment gets its own checkpoint beat, distinct from the plain point-gain
+      // flash every meter gets. The final (4th) crossing is the win itself, left to
+      // runWinSequence's own glow+sound instead of a checkpoint beat here.
+      const milestoneCheckpointCompleted =
+        milestoneNextCompleted > milestonePrevCompleted && milestoneNextCompleted < MILESTONE_COUNT
+          ? milestoneNextCompleted - 1
+          : null
+
       // Each meter that actually moved this round updates, flashes, and dings one at a
-      // time (in Backlog / Tech Debt / Burnout / Vesting order) rather than all at
+      // time (in Backlog / Tech Debt / Burnout / Vesting / Milestones order) rather than all at
       // once — a meter untouched by anything this round is skipped outright. Once the
       // whole cascade finishes, a full second of quiet passes before the round's Slack
       // message posts below, so that update reads as its own separate beat.
-      const meterSteps: { changed: boolean; apply: () => void }[] = [
+      const meterSteps: { changed: boolean; sound?: SoundName; apply: () => void }[] = [
         {
           changed: hasNonZeroDelta([playerBacklog, managerBacklog, backlogResetSentinel, ...recurringBacklog]),
           apply: () => {
@@ -2045,33 +2219,41 @@ function GameBoard() {
           },
         },
         {
-          // Vesting ticks up 1% every turn regardless of which cards were played, on
-          // top of whatever the cards themselves add or subtract — so it only counts
-          // as unchanged if a card's own delta exactly cancels that baseline tick.
-          changed: VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting]) !== 0,
+          // Vesting ticks up every turn regardless of which cards were played — it
+          // takes no card input at all (see VESTING_MAX's comment), so this is always
+          // "changed".
+          changed: true,
           apply: () => {
-            setVesting((prev) =>
-              Math.min(
-                VESTING_MAX,
-                Math.max(0, prev + VESTING_PER_TURN + sumDeltas([playerVesting, managerVesting, ...recurringVesting])),
-              ),
-            )
+            setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + VESTING_PER_TURN)))
             setVestingFlashKey((k) => k + 1)
+          },
+        },
+        {
+          changed: milestoneDelta !== 0,
+          sound: milestoneCheckpointCompleted !== null ? 'gm-action-milestone-checkpoint' : undefined,
+          apply: () => {
+            setMilestonePoints(milestoneNext)
+            setMilestoneFlashKey((k) => k + 1)
+            if (milestoneCheckpointCompleted !== null) {
+              setMilestoneCheckpointIndex(milestoneCheckpointCompleted)
+              setMilestoneCheckpointKey((k) => k + 1)
+            }
           },
         },
       ]
 
       const runMeterStep = (index: number) => {
         if (index >= meterSteps.length) {
-          // This round's own four meter steps have all had their turn — re-arm the
-          // win/lose effect for whatever Slack posts below (see cascadeSettling above),
-          // then check whether vesting just hit 100% or any of them actually maxed a
-          // danger stat out. If so, runWinSequence/runLossSequence takes over entirely
-          // — no next round, no Slack post, just the glow cascade and then game over.
+          // This round's own meter steps have all had their turn — re-arm the win/lose
+          // effect for whatever Slack posts below (see cascadeSettling above), then
+          // check whether either win path just completed or any danger stat actually
+          // maxed out. If so, runWinSequence/runLossSequence takes over entirely — no
+          // next round, no Slack post, just the glow cascade and then game over.
           // Checked in the same order as the win/lose effect above: a win this round
           // can't also be a loss, but if it somehow were, winning takes priority.
           cascadeSettling.current = false
-          if (vestingRef.current >= VESTING_MAX && runWinSequence()) return
+          if (runWinSequence(vestingRef.current >= VESTING_MAX, milestonePointsRef.current >= MILESTONE_POINTS_MAX))
+            return
           if (runLossSequence(backlogRef.current, techDebtRef.current, burnoutRef.current)) return
 
           // The meter cascade above has fully settled and nothing maxed out — only now
@@ -2082,6 +2264,8 @@ function GameBoard() {
           // Whoever led this round, the other side leads the next one.
           setLeader((prev) => (prev === 'manager' ? 'player' : 'manager'))
           setPlayerHasLed(false)
+          // A fresh Story Point becomes available every round, same cadence as Vesting.
+          setStoryPointsAvailable((prev) => prev + STORY_POINTS_PER_TURN)
 
           // Once per round, a random still-unused flavor message (or whole
           // conversation) posts to its channel and nudges the meters same as a played
@@ -2105,7 +2289,7 @@ function GameBoard() {
                 setBacklog((prev) => applyClearableDelta(prev, [message.backlog]))
                 setTechDebt((prev) => applyClearableDelta(prev, [message.techDebt]))
                 setBurnout((prev) => Math.min(BURNOUT_MAX, Math.max(0, prev + (message.burnout ?? 0))))
-                setVesting((prev) => Math.min(VESTING_MAX, Math.max(0, prev + (message.vesting ?? 0))))
+                applyMilestonesPct(message.milestones ?? 0)
               }
             }, 1000),
           )
@@ -2119,7 +2303,7 @@ function GameBoard() {
         }
 
         step.apply()
-        playSound('gm-action-meter-up')
+        playSound(step.sound ?? 'gm-action-meter-up')
         meterSequenceTimers.current.push(
           window.setTimeout(() => runMeterStep(index + 1), METER_STEP_DELAY_MS),
         )
@@ -2184,14 +2368,19 @@ function GameBoard() {
               techDebt={techDebt}
               burnout={burnout}
               vesting={vesting}
+              milestonePoints={milestonePoints}
               backlogFlashKey={backlogFlashKey}
               techDebtFlashKey={techDebtFlashKey}
               burnoutFlashKey={burnoutFlashKey}
               vestingFlashKey={vestingFlashKey}
+              milestoneFlashKey={milestoneFlashKey}
+              milestoneCheckpointIndex={milestoneCheckpointIndex}
+              milestoneCheckpointKey={milestoneCheckpointKey}
               backlogMaxed={backlogMaxed}
               techDebtMaxed={techDebtMaxed}
               burnoutMaxed={burnoutMaxed}
               vestingMaxed={vestingMaxed}
+              milestonesWon={milestonesWon}
             />
           </div>
         </div>
@@ -2207,6 +2396,7 @@ function GameBoard() {
           playerHasLed={playerHasLed}
           lockMessage={lockMessage}
           blurredTurns={blurTurnsRemaining}
+          storyPointsAvailable={storyPointsAvailable}
         />
         <SlackPanel
           channels={CHANNEL_ORDER}

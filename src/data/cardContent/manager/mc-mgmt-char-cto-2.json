@@ -1,0 +1,10 @@
+{
+  "title": "Postgres Über Alles",
+  "category": "Management",
+  "type": "Recurring",
+  "character": "CTO",
+  "description": "The CTO read you can replace AWS with a single instance of Postgres. You never should have told him about Hacker News.",
+  "action": "Recurring",
+  "backlog" : 10,
+  "burnout" : 10 
+}

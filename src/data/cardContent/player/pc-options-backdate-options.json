@@ -4,5 +4,6 @@
   "action": "One Time",
   "playableAgainst": ["*"],
   "description": "Oops, you accidentally forwarded HR this virus. Funny how it backdated your option grants.",
-  "vesting": 15
+  "storyPoints": 2,
+  "milestones": 15
 }

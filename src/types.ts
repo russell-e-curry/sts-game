@@ -14,15 +14,17 @@ interface CardBase {
   character?: string
   /** Derived from the card's filename; the file may not exist yet if no art has been made. */
   image: string
+  /** How many Story Points the player must have available to play this (player) card — checked against the player's storyPointsAvailable when it's dropped, blocking the play with an error if there aren't enough. Displayed on the card face. Omitted if this card has no cost (always playable regardless of Story Points). Not read for manager cards. */
+  storyPoints?: number
   /** Signed delta applied to the player's backlog, or '*' to clear it to 0. Omitted if this card doesn't touch it. */
   backlog?: number | '*'
   /** Signed delta applied to technical debt when this card resolves, or '*' to clear it to 0. Omitted if this card doesn't touch it. */
   techDebt?: number | '*'
   /** Signed delta applied to burnout when this card resolves (positive = more burnout). Omitted if this card doesn't touch it. */
   burnout?: number
-  /** Signed point delta applied to vesting when this card resolves (max 100). Displayed on the card face as points, not a percentage. Omitted if this card doesn't touch it. */
-  vesting?: number
-  /** A secondary effect this card applies alongside its stat deltas, e.g. "Block Recurring" — combined with `target` and `duration`. Omitted if this card has no secondary effect. */
+  /** Signed percentage delta (e.g. 25 = 25%) applied toward the current milestone when this card resolves — computed as a percentage of one milestone segment's point value, then clamped so it can't push progress past the current segment's end (or below its start, for a negative value) even if the percentage itself would overshoot. Omitted if this card doesn't touch it. */
+  milestones?: number
+  /** A secondary effect this card applies alongside its stat deltas, e.g. "Block" — combined with `target` and `duration`. Omitted if this card has no secondary effect. */
   effect?: string
   /** See CardTarget. Which recurring card category `effect` applies to (`{ kind: 'Category' }`), which character(s) an `action: 'Eliminate'` card takes down (`{ kind: 'Character' }`), or which single stat an `action: 'Reset'` card clears (`{ kind: 'Stat' }`) — omitted on a reset card clears both stats, or on an eliminate card eliminates by matching `category` against a recurring effect instead. Omitted if this card has no secondary effect and isn't an eliminate-character or targeted-reset card. */
   target?: CardTarget

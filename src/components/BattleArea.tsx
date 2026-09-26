@@ -23,7 +23,7 @@ export interface ResolvedRound {
   /** Set when this round's player card has action 'cancel' — neutralizes the
    * manager's card this same round and renders the CANCELLED overlay on it. */
   managerCardCancelled?: boolean
-  /** Turns left that a 'block recurring' card has suspended this round's manager
+  /** Turns left that a 'block' effect card has suspended this round's manager
    * recurring card for — undefined once it's no longer suspended. Renders the
    * SUSPENDED overlay on the manager's card. */
   managerCardSuspendedTurns?: number
@@ -54,12 +54,26 @@ interface BattleAreaProps {
    * they're the shared board areas a blur card obscures alongside the player's own
    * hand (see Hand's `blurredTurns` prop and Card's). */
   blurredTurns?: number
+  /** The player's current spendable Story Points — shown under the player's active-
+   * column placeholder label (see GameBoard's storyPointsAvailable) whenever it's
+   * the player's move, so they can see what they have to spend before dropping a
+   * costed card. */
+  storyPointsAvailable: number
 }
 
 const MIN_THUMB_WIDTH = 40
 
 const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleArea(
-  { history, activePlayerCard, activeManagerCard, leader, playerHasLed, lockMessage, blurredTurns },
+  {
+    history,
+    activePlayerCard,
+    activeManagerCard,
+    leader,
+    playerHasLed,
+    lockMessage,
+    blurredTurns,
+    storyPointsAvailable,
+  },
   activeSlotRef,
 ) {
   const historyRowRef = useRef<HTMLDivElement>(null)
@@ -267,10 +281,14 @@ const BattleArea = forwardRef<HTMLDivElement, BattleAreaProps>(function BattleAr
           ) : activeManagerCard ? (
             <div className="battle-slot-placeholder battle-slot-placeholder-player">
               <p className="battle-slot-placeholder-label">Play a Card</p>
+              <p className="battle-slot-placeholder-points">{storyPointsAvailable}</p>
+              <p className="battle-slot-placeholder-points-label">Story Points Remaining</p>
             </div>
           ) : leader === 'player' && !playerHasLed ? (
             <div className="battle-slot-placeholder battle-slot-placeholder-player">
               <p className="battle-slot-placeholder-label">Your Turn</p>
+              <p className="battle-slot-placeholder-points">{storyPointsAvailable}</p>
+              <p className="battle-slot-placeholder-points-label">Story Points Remaining</p>
             </div>
           ) : (
             <div className="battle-slot-placeholder" />

@@ -1,7 +1,12 @@
-.meters {
+/* Wraps the 2x2 grid of Backlog/Tech Debt/Burnout/Vesting plus the full-width
+   Milestones bar below it — centers the whole group vertically within the panel's
+   fixed height (see .hud-panel's container-type: size in GameBoard.css) rather than
+   each row centering independently. */
+.meters-wrap {
   display: flex;
-  flex-direction: row;
-  gap: 24px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10cqh;
   height: 100%;
   width: 100%;
   max-width: 640px;
@@ -9,13 +14,20 @@
   box-sizing: border-box;
 }
 
+.meters {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .meters-column {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 12cqh;
   flex: 1;
-  height: 100%;
   min-width: 0;
 }
 
@@ -152,12 +164,12 @@
 }
 
 /* A meter that's actually maxed out — game-ending — pulses harder and throws a bright
-   white halo on top of its own color, overriding the critical/celebrate pulse above
-   (a danger stat is always both >= CRITICAL_THRESHOLD and maxed at once, and vesting
-   is always both celebrating and maxed at once, so this rule — defined last — always
-   wins on source order). Set once that meter's turn comes up in the game-over glow
-   cascade (see runLossSequence/runWinSequence in GameBoard) and left on through the
-   game-over fade-in. */
+   white halo on top of its own color, overriding the critical/celebrate pulse above (a
+   danger stat is always both >= CRITICAL_THRESHOLD and maxed at once, and Vesting is
+   always both celebrating and maxed at once, so this rule — defined last — always wins
+   on source order). Set once that meter's turn comes up in the game-over glow cascade
+   (see runLossSequence/runWinSequence in GameBoard) and left on through the game-over
+   fade-in. */
 .meter-bar-fill-maxed {
   animation: meter-shimmer 2.8s linear infinite, meter-maxed-pulse 0.5s ease-in-out infinite;
 }
@@ -241,4 +253,120 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* The full-width Milestones bar sits below the 2x2 grid (see .meters-wrap) rather than
+   inside one of its columns — same .meter-bar column layout (label, then track) as
+   every other meter, just spanning the whole panel's width. */
+.meter-bar-milestones {
+  width: 100%;
+}
+
+/* Milestones render as MILESTONE_COUNT discrete segments in a row rather than one
+   continuous track (see milestoneSegments in Meters.tsx) — points fill segment 0
+   first, then spill into segment 1, and so on, so each one completes and stays lit in
+   turn instead of the whole bar just creeping up. No count/caption is rendered here —
+   the filled regions themselves are the only readout. */
+.milestone-track {
+  display: flex;
+  gap: 1.5cqh;
+  height: 11cqh;
+}
+
+.milestone-segment {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.milestone-segment-fill {
+  height: 100%;
+  border-radius: 999px;
+  position: relative;
+  background: linear-gradient(90deg, #ffd76a, #d4a017);
+  box-shadow: 0 0 8px rgba(212, 160, 23, 0.6);
+  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.milestone-segment-fill::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  background: linear-gradient(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.milestone-segment-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 48%,
+    rgba(255, 255, 255, 0.5) 52%,
+    transparent 100%
+  );
+  background-size: 250% 100%;
+  mix-blend-mode: overlay;
+  animation: meter-shimmer 2.8s linear infinite;
+  pointer-events: none;
+}
+
+/* A finished segment's width is already 100% (see milestoneSegments) — this just
+   keeps its glow steady so it visibly reads as "done" once points move on to the next
+   segment. */
+.milestone-segment-complete .milestone-segment-fill {
+  box-shadow: 0 0 10px rgba(212, 160, 23, 0.85);
+}
+
+/* The segment currently filling gets a celebratory pulse once it's nearly full — same
+   idea as the danger stats' critical pulse, just framed as good news instead of bad. */
+.milestone-segment-celebrate .milestone-segment-fill {
+  animation: meter-shimmer 2.8s linear infinite, meter-celebrate-pulse 1.6s ease-in-out infinite;
+}
+
+/* Every segment gets the bright maxed pulse once all four are actually complete (the
+   win) — set via milestonesWon once its turn comes up in the game-over glow cascade
+   (see runWinSequence in GameBoard) and left on through the game-over fade-in. */
+.milestone-segment-maxed .milestone-segment-fill {
+  animation: meter-shimmer 2.8s linear infinite, meter-maxed-pulse 0.5s ease-in-out infinite;
+}
+
+.milestone-segment-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: meter-flash-burst 0.6s ease-out;
+}
+
+/* One-shot burst on the specific segment that just crossed a fresh 100-point line —
+   longer and brighter than the plain point-gain flash above, so a completed milestone
+   reads as its own distinct beat rather than just another tick. */
+.milestone-segment-checkpoint-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: milestone-checkpoint-burst 0.9s ease-out;
+}
+
+@keyframes milestone-checkpoint-burst {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

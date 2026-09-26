@@ -1,0 +1,11 @@
+{
+  "title": "Budget Freeze",
+  "category": "Management",
+  "type": "Pause",
+  "character": "CFO",
+  "description": "The Chief Financial Officer freezes the budget, your recurring cards are blocked for 3 turns.",
+  "action": "Recurring",
+  "effect": "Block",
+  "target": { "kind": "Category", "category": "*" },
+  "duration": 3
+}

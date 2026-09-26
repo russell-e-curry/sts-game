@@ -3,6 +3,7 @@
   "category": "Coding",
   "action": "One Time",
   "description": "Six energy drinks and a broken circadian rhythm later, the backlog's looking better - you are not.",
+  "storyPoints": 2,
   "backlog": -25,
   "techDebt": 40,
   "burnout": 15

@@ -183,11 +183,15 @@
 }
 
 /* The slot the player's next card lands in — glows to draw the eye there since it's
-   the one drop target that's always waiting on the player. */
+   the one drop target that's always waiting on the player. Stacks vertically (rather
+   than the single-line center of .battle-slot-placeholder-manager) since the Story
+   Points readout (see .battle-slot-placeholder-points) sits under the label here. */
 .battle-slot-placeholder-player {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   box-sizing: border-box;
   animation: battle-slot-glow 1.8s ease-in-out infinite;
 }
@@ -212,6 +216,30 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: rgba(214, 180, 255, 0.9);
+}
+
+/* The player's current spendable Story Points, shown under the label in the player's
+   dropzone placeholder (see BattleArea's storyPointsAvailable prop) — the number
+   itself is large so it reads at a glance, with .battle-slot-placeholder-points-label
+   underneath spelling out what it's counting. */
+.battle-slot-placeholder-points {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(170, 59, 255, 0.6);
+}
+
+.battle-slot-placeholder-points-label {
+  margin: 0;
+  padding: 0 10%;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(214, 180, 255, 0.75);
 }
 
 @keyframes battle-slot-glow {

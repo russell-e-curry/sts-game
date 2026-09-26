@@ -75,6 +75,13 @@
   opacity: 0.25;
 }
 
+/* A locked card that's hover/click-enlarged reads normally, not dimmed — the player is
+   actively inspecting it, so the "can't play yet" dimming would just make the enlarged
+   card harder to read for no benefit. */
+.game-card-locked.game-card-hovered {
+  opacity: 1;
+}
+
 .game-card:active {
   cursor: grabbing;
 }
@@ -196,7 +203,7 @@
 }
 
 /* Same idea as .game-card-stopped-overlay, but for a recurring card temporarily
-   suspended by a 'block recurring' card — a cooler-toned stripe (rather than the
+   suspended by a 'block' effect card — a cooler-toned stripe (rather than the
    neutral grey stopped/cancelled use) plus a second line counting down the turns left,
    distinguishing "paused, resumes later" from the other two overlays' "done for good". */
 .game-card-suspended-overlay {
@@ -365,7 +372,7 @@
   box-shadow: 0 0 10px rgba(183, 188, 196, 0.6);
 }
 
-/* Same gold used for vesting stat pills elsewhere on the card, so "reset" reads as a
+/* Same gold used for milestone stat pills elsewhere on the card, so "reset" reads as a
    positive/beneficial action rather than a warning like the eliminate badge. */
 .game-card-reset-badge {
   flex-shrink: 0;
@@ -417,7 +424,7 @@
 }
 
 /* A card whose `type` reads "character" gets a bright gold face — the same gold used
-   for the reset badge and vesting stat pills — so a card centered on a specific
+   for the reset badge and milestone stat pills — so a card centered on a specific
    person stands out rather than blending into the default charcoal face, regardless
    of what its `action` actually does (e.g. pc-mgmt-char-qa-lead.json: type
    'character', action 'recurring', still gets this face). Text flips dark, same
@@ -525,9 +532,20 @@
   line-height: 1.35;
 }
 
-/* Every stat the card actually defines (backlog, tech debt, vesting, burnout, in that
-   order — see Card.tsx) gets its own badge; wraps to a second line rather than
-   shrinking/clipping on a card that happens to define all four at once. */
+/* The Story Point cost, when this card has one, renders as its own badge above the
+   footer rather than inside it — unlike every stat below it applies regardless of
+   `action` (even a Reset/Cancel/Blur card, whose own badge replaces the footer
+   entirely — see Card.tsx), since what a card costs to play is independent of what
+   it does once played. */
+.game-card-cost-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2cqw;
+}
+
+/* Every stat the card actually defines (backlog, tech debt, milestone points,
+   milestones, burnout, in that order — see Card.tsx) gets its own full-width badge
+   (see .game-card-stat-full) and stacks vertically rather than sharing a row. */
 .game-card-footer {
   display: flex;
   flex-wrap: wrap;
@@ -564,7 +582,27 @@
   box-shadow: 0 0 10px rgba(170, 59, 255, 0.6);
 }
 
-.game-card-stat-color-vesting {
+/* Forces a stat pill onto its own full-width row within the footer's flex-wrap —
+   flex-basis 100% pushes any other stat badges before/after it onto separate rows,
+   so it always reads as a single banner spanning the card rather than a pill sharing
+   a row with backlog/tech-debt/burnout. Used by the Story Points and Milestones
+   badges below. */
+.game-card-stat-full {
+  flex: 1 1 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Teal, distinct from Story Points' gold — both feed the same Milestones meter, but
+   Milestones' percentage-of-segment math is a different enough mechanic that they
+   shouldn't read as the same badge. */
+.game-card-stat-color-milestones-pct {
+  background: linear-gradient(90deg, #4fd6b8, #1f9e84);
+  box-shadow: 0 0 10px rgba(31, 158, 132, 0.6);
+  color: #0c2420;
+}
+
+.game-card-stat-color-milestone {
   background: linear-gradient(90deg, #ffd76a, #d4a017);
   box-shadow: 0 0 10px rgba(212, 160, 23, 0.6);
   color: #23242c;
@@ -576,4 +614,12 @@
   min-width: 4ch;
   background: #c81e1e;
   box-shadow: 0 0 10px rgba(200, 30, 30, 0.6);
+}
+
+/* Slate, deliberately neutral against the rest of the badges' colors — this one's a
+   cost/requirement rather than an effect, so it shouldn't read as "good" (gold/teal)
+   or "bad" (red/purple) the way the others do. */
+.game-card-stat-color-cost {
+  background: #475569;
+  box-shadow: 0 0 10px rgba(71, 85, 105, 0.6);
 }

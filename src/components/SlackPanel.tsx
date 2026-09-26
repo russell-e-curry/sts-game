@@ -11,7 +11,7 @@ export interface PostedSlackMessage {
   backlog?: number
   techDebt?: number
   burnout?: number
-  vesting?: number
+  milestones?: number
 }
 
 function formatDelta(value: number) {
@@ -122,7 +122,7 @@ function SlackPanel({ channels, activeChannel, onSelectChannel, messages, compac
                   {(msg.techDebt !== undefined ||
                     msg.backlog !== undefined ||
                     msg.burnout !== undefined ||
-                    msg.vesting !== undefined) && (
+                    msg.milestones !== undefined) && (
                     <div className="slack-message-badges">
                       {msg.techDebt !== undefined && (
                         <span className="slack-badge slack-badge-techdebt">Tech Debt {formatDelta(msg.techDebt)}</span>
@@ -133,8 +133,10 @@ function SlackPanel({ channels, activeChannel, onSelectChannel, messages, compac
                       {msg.burnout !== undefined && (
                         <span className="slack-badge slack-badge-burnout">Burnout {formatDelta(msg.burnout)}</span>
                       )}
-                      {msg.vesting !== undefined && (
-                        <span className="slack-badge slack-badge-vesting">Vesting {formatDelta(msg.vesting)}</span>
+                      {msg.milestones !== undefined && (
+                        <span className="slack-badge slack-badge-milestone">
+                          Milestone {formatDelta(msg.milestones)}%
+                        </span>
                       )}
                     </div>
                   )}

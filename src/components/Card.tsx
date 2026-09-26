@@ -20,7 +20,7 @@ interface CardProps<T extends GameCard> {
   eliminated?: boolean
   /** True once a 'Cancel' card played the same round has neutralized this card — renders a striped overlay, same idea as `stopped` but from a same-round cancel rather than a later-round eliminate. */
   cancelled?: boolean
-  /** Turns left that a 'Block Recurring' card has suspended this recurring card for — renders a striped overlay (and the countdown) and pauses the recurring glow, same idea as `stopped` but temporary rather than permanent. Undefined/0 means not suspended. */
+  /** Turns left that a 'Block' effect card has suspended this recurring card for — renders a striped overlay (and the countdown) and pauses the recurring glow, same idea as `stopped` but temporary rather than permanent. Undefined/0 means not suspended. */
   suspendedTurns?: number
   /** Turns left that a manager 'Blur' card has this card's face out of focus for — renders it unreadable (without hiding its position/shape) plus a "HUNG OVER" overlay counting down the same duration, same idea as `suspendedTurns` but board-wide rather than tied to one recurring effect. Undefined/0 means not blurred. Doesn't affect interaction (dragging/playing still works). */
   blurredTurns?: number
@@ -216,32 +216,41 @@ function Card<T extends GameCard>({
             {card.description}
           </p>
         </div>
+        {card.storyPoints !== undefined && (
+          <div className="game-card-cost-row">
+            <span className="game-card-stat game-card-stat-full game-card-stat-color-cost">
+              {card.storyPoints} Story Point{card.storyPoints === 1 ? '' : 's'}
+            </span>
+          </div>
+        )}
         {card.action !== 'Reset' && card.action !== 'Cancel' && card.action !== 'Blur' && (
           <div className="game-card-footer">
             {card.action === 'Reversal' ? (
-              <span className="game-card-stat game-card-stat-color-vesting">Reverse manager's card</span>
+              <span className="game-card-stat game-card-stat-color-milestone">Reverse manager's card</span>
             ) : (
               <>
                 {card.backlog !== undefined && (
                   <span
-                    className={`game-card-stat ${card.backlog === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-backlog'}`}
+                    className={`game-card-stat game-card-stat-full ${card.backlog === '*' ? 'game-card-stat-color-milestone' : 'game-card-stat-color-backlog'}`}
                   >
-                    Backlog {card.backlog === '*' ? 'Reset' : card.backlog}
+                    Backlog {card.backlog === '*' ? 'Reset' : card.backlog > 0 ? `+${card.backlog}` : card.backlog}
                   </span>
                 )}
                 {card.techDebt !== undefined && (
                   <span
-                    className={`game-card-stat ${card.techDebt === '*' ? 'game-card-stat-color-vesting' : 'game-card-stat-color-techdebt'}`}
+                    className={`game-card-stat game-card-stat-full ${card.techDebt === '*' ? 'game-card-stat-color-milestone' : 'game-card-stat-color-techdebt'}`}
                   >
-                    Tech Debt {card.techDebt === '*' ? 'Reset' : card.techDebt}
+                    Tech Debt {card.techDebt === '*' ? 'Reset' : card.techDebt > 0 ? `+${card.techDebt}` : card.techDebt}
                   </span>
                 )}
-                {card.vesting !== undefined && (
-                  <span className="game-card-stat game-card-stat-color-vesting">Vesting {card.vesting}</span>
+                {card.milestones !== undefined && (
+                  <span className="game-card-stat game-card-stat-full game-card-stat-color-milestones-pct">
+                    Milestones {card.milestones > 0 ? `+${card.milestones}` : card.milestones}%
+                  </span>
                 )}
                 {card.burnout !== undefined && (
-                  <span className="game-card-stat game-card-stat-color-burnout">
-                    {card.burnout > 0 ? `+${card.burnout}` : card.burnout}
+                  <span className="game-card-stat game-card-stat-full game-card-stat-color-burnout">
+                    Burnout {card.burnout > 0 ? `+${card.burnout}` : card.burnout}
                   </span>
                 )}
               </>
