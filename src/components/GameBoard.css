@@ -85,27 +85,22 @@
 
 /* .history-panel and .active-column are defined in BattleArea.css (their own
    internal padding/border/flex treatment lives there) — this is just how they share
-   .row-middle's width with the Slack panel. .active-column doesn't grow (see its own
-   flex-basis: auto in BattleArea.css), so the width left over after it splits evenly
-   between .history-panel and .slack-panel: both flex: 1 1 0 (flex-basis: 0, not
-   auto) so their own natural content size — hugely different between an empty-ish
-   history strip and Slack's chat log — plays no part in the split, and both grow/
-   shrink together as the window resizes, keeping the dropzone visually centered
-   between them. min-width matches .slack-panel's below, just enough to stay legible
-   rather than getting squeezed to nothing on a narrow window. */
+   .row-middle's width with the status panel. .history-panel is exactly as wide as the
+   deck + hand above/below it (--history-width, measured in GameBoard.tsx's cardScale
+   effect), so .active-column lands in the same column as the discard slots and
+   .status-panel takes whatever is left to the right of it. */
 .history-panel {
-  flex: 1 1 0;
-  min-width: 260px;
+  flex: 0 1 var(--history-width, 50%);
 }
 
 /* .discard-column is defined in BattleArea.css — placed here in .row-bottom,
    directly after the player's hand. */
 
-/* Defined in SlackPanel.css — see .history-panel's comment above; the two split
+/* Defined in StatusPanel.css — see .history-panel's comment above; the two split
    .row-middle's leftover width evenly and in step with each other. */
-.slack-panel {
+.status-panel {
   flex: 1 1 0;
-  min-width: 260px;
+  min-width: 320px;
 }
 
 /* Fills its row (there's no label above it any more); its card rows size themselves

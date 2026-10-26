@@ -146,7 +146,6 @@ const MANAGER_DISCARD_BASE_BURNOUT_RELIEF = 10
 // much of that a row's non-card element (meters/Slack/discard) needs reserved.
 const ROW_ITEM_GAP = 20
 const METERS_MIN_WIDTH = 0 // row-top's right side is empty now that the meters live in .status-panel
-const HISTORY_MIN_WIDTH = 260 // reserved for .history-panel in row-middle, alongside the dropzone and status panel
 const SLACK_MIN_WIDTH = 320 // reserved for .status-panel in row-middle, matching its own CSS min-width
 const BOARD_ROW_GAP = 20
 const BOARD_PADDING = 20
@@ -415,6 +414,9 @@ function GameBoard() {
   // against the true scale: 1 size rather than compounding on the previous frame's
   // already-shrunk one.
   const [cardScale, setCardScale] = useState(1)
+  // Width of the deck + hand (see the cardScale effect) — the history panel matches it so
+  // the dropzone sits in the discard slots' column.
+  const [historyWidth, setHistoryWidth] = useState<number | null>(null)
   const cardScaleRef = useRef(1)
   // How many slots each hand actually renders (see the resize-sync effect below,
   // which keeps hand/managerHand's own length equal to this) — lazily initialized
@@ -992,7 +994,7 @@ function GameBoard() {
       // divide it with), so the same availableWidth applies to all three checks below.
       const availableWidth = Math.max(0, boardEl.getBoundingClientRect().width - BOARD_PADDING * 2)
       const rowTopNeeded = managerRowWidth + ROW_ITEM_GAP + METERS_MIN_WIDTH
-      const rowMiddleNeeded = activeColumnWidth + ROW_ITEM_GAP * 2 + HISTORY_MIN_WIDTH + SLACK_MIN_WIDTH
+      const rowMiddleNeeded = playerRowWidth + activeColumnWidth + ROW_ITEM_GAP * 2 + SLACK_MIN_WIDTH
       const rowBottomNeeded = playerRowWidth + ROW_ITEM_GAP + discardColumnWidth
       const widthScale = Math.min(
         1,
@@ -1034,6 +1036,7 @@ function GameBoard() {
       const cardHeight = naturalCardHeight * nextScale
       cardScaleRef.current = nextScale
       setCardScale(nextScale)
+      setHistoryWidth(playerRowWidth * nextScale)
       setVisibleHandCards(visibleHandCardsForWidth(window.innerWidth))
       setRowHeights([
         cardHeight + HAND_SCROLLBAR_GUTTER,
@@ -2357,6 +2360,7 @@ function GameBoard() {
         {
           '--card-scale': cardScale,
           '--visible-hand-cards': visibleHandCards,
+          ...(historyWidth !== null && { '--history-width': `${historyWidth}px` }),
         } as CSSProperties
       }
     >
