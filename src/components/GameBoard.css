@@ -168,48 +168,6 @@
   min-height: 0;
 }
 
-/* No label of its own (unlike .top-bar-manager) — .hud-panel fills the full cell's
-   height (via its own flex: 1 below) but, since this stays flex-direction: column,
-   NOT its width — align-items: flex-end leaves .hud-panel's width to its own content
-   (capped at max-width: 640px below) and pushes it against .hud's right edge. .hud
-   itself is flex: 1 (taking whatever width .top-bar-manager leaves it in .row-top),
-   so together this reads as "meters on the far right". */
-.hud {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  min-height: 0;
-  min-width: 0;
-}
-
-.hud-panel {
-  flex: 1;
-  /* .hud (see above) no longer stretches this to fill its own width — align-items:
-     flex-end there leaves this box free to size to its content instead, which
-     without an explicit width would otherwise mean the *background box itself*
-     shrinks to fit however narrow Meters' own internal content happens to be,
-     rather than reliably reading as one solid panel up to Meters' own 640px cap
-     (see .meters in Meters.css). min(640px, 100%) reproduces that cap here (100%
-     resolves against .hud's width even though this isn't stretched). */
-  width: min(640px, 100%);
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-  box-sizing: border-box;
-  overflow: hidden;
-  background: linear-gradient(135deg, rgba(122, 31, 214, 0.25), rgba(20, 21, 31, 0.6));
-  border: 1px solid var(--border-accent);
-  border-radius: 16px;
-  padding: 10px 20px;
-  box-shadow: 0 0 24px rgba(122, 31, 214, 0.25);
-  /* Sized in cqh (percent of this panel's own height), same idea as .game-card's
-     container-type: inline-size — lets the meter bars shrink with the row's height
-     instead of overflowing it when the window gets short. container-type: size (not
-     inline-size) is needed here since it's the block axis being queried. */
-  container-type: size;
-}
-
 .drag-ghost {
   position: fixed;
   pointer-events: none;

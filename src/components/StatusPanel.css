@@ -1,0 +1,173 @@
+/* Sits in .row-middle in the slot the Slack panel used to have (flex sizing is set in
+   GameBoard.css alongside .history-panel). Meters on top, active effects below, and a
+   one-line Slack ticker pinned to the bottom. */
+.status-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(122, 31, 214, 0.25), rgba(20, 21, 31, 0.6));
+  border: 1px solid var(--border-accent);
+  border-radius: 16px;
+  box-shadow: 0 0 24px rgba(122, 31, 214, 0.25);
+  font-size: 13px;
+}
+
+/* container-type: size so Meters' cqh sizing resolves against this box's own height
+   (same trick .hud-panel used) — a fixed share of the panel, leaving the rest for
+   effects. */
+.status-meters {
+  flex: 0 0 48%;
+  min-height: 0;
+  padding: 10px 20px;
+  box-sizing: border-box;
+  container-type: size;
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px solid var(--border-accent);
+}
+
+.status-effects {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-effect-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.status-effect {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-effect-manager {
+  border-left-color: #ff6b5b;
+}
+
+.status-effect-player {
+  border-left-color: #ffd76a;
+}
+
+.status-effect-suspended {
+  opacity: 0.55;
+}
+
+.status-effect-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.status-effect-title {
+  font-weight: 700;
+  color: #fff;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-effect-turns {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+.status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.status-chip-backlog {
+  background: linear-gradient(90deg, #2f8fff, #1a5fd6);
+}
+
+.status-chip-techdebt {
+  background: linear-gradient(90deg, #aa3bff, #7a1fd6);
+}
+
+.status-chip-burnout {
+  background: linear-gradient(90deg, #ff6b5b, #c81e1e);
+}
+
+.status-chip-milestone {
+  background: linear-gradient(90deg, #ffd76a, #d4a017);
+  color: #23242c;
+}
+
+.status-chip-note {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.status-empty {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.status-ticker {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid var(--border-accent);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  min-width: 0;
+}
+
+.status-ticker-channel {
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+
+.status-ticker-author {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-ticker-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

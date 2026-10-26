@@ -26,7 +26,7 @@
 .meters-column {
   display: flex;
   flex-direction: column;
-  gap: 12cqh;
+  gap: 6cqh;
   flex: 1;
   min-width: 0;
 }
@@ -369,4 +369,24 @@
   100% {
     opacity: 0;
   }
+}
+
+/* Heading over each of the two meter columns — the left column loses the game when
+   any bar maxes out, the right wins it when either one does (see GameBoard's
+   runLossSequence/runWinSequence). Smaller than the bar labels so it reads as a
+   caption for the group, not another meter. */
+.meters-group-label {
+  font-size: 5.5cqh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.meters-group-label-lose {
+  color: #ff9c8f;
+}
+
+.meters-group-label-win {
+  color: #ffe19a;
 }

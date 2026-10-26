@@ -7,14 +7,14 @@ import { shuffle } from '../lib/shuffle'
 import { playSound, getSoundDurationMs, type SoundName } from '../lib/sounds'
 import Deck from './Deck'
 import ManagerHand from './ManagerHand'
-import Meters from './Meters'
 import BattleArea, { type ResolvedRound } from './BattleArea'
 import Hand from './Hand'
 import Card from './Card'
 import DiscardZone from './DiscardZone'
 import DisintegrateEffect from './DisintegrateEffect'
 import ManagerDisintegrateEffect from './ManagerDisintegrateEffect'
-import SlackPanel, { type PostedSlackMessage } from './SlackPanel'
+import type { PostedSlackMessage } from './SlackPanel'
+import StatusPanel, { type ActiveEffect } from './StatusPanel'
 import SplashScreen from './SplashScreen'
 import GameOverScreen from './GameOverScreen'
 import { allSlackItems, isSlackConversation, CHANNEL_ORDER } from '../data/slackChannels'
@@ -145,9 +145,9 @@ const MANAGER_DISCARD_BASE_BURNOUT_RELIEF = 10
 // each row actually has once the board's own gaps/padding are accounted for, and how
 // much of that a row's non-card element (meters/Slack/discard) needs reserved.
 const ROW_ITEM_GAP = 20
-const METERS_MIN_WIDTH = 320 // reserved for .hud-panel in row-top, alongside the manager's deck+hand
-const HISTORY_MIN_WIDTH = 260 // reserved for .history-panel in row-middle, alongside the dropzone and Slack
-const SLACK_MIN_WIDTH = 260 // reserved for .slack-panel in row-middle, matching its own CSS min-width
+const METERS_MIN_WIDTH = 0 // row-top's right side is empty now that the meters live in .status-panel
+const HISTORY_MIN_WIDTH = 260 // reserved for .history-panel in row-middle, alongside the dropzone and status panel
+const SLACK_MIN_WIDTH = 320 // reserved for .status-panel in row-middle, matching its own CSS min-width
 const BOARD_ROW_GAP = 20
 const BOARD_PADDING = 20
 // The rest of these match the fixed chrome around row 2's stacked cards (see
@@ -212,6 +212,7 @@ function hasNonZeroDelta(deltas: (number | '*' | undefined)[]) {
 interface RecurringEffect {
   roundId: string
   side: 'player' | 'manager'
+  title: string
   category: string
   // Which character (if any) this recurring card is attributed to — an 'eliminate' +
   // target:'character' card takes down every not-yet-stopped recurring effect that
@@ -458,7 +459,7 @@ function GameBoard() {
   // setDealt(true) every time a post-deal resize's queue idles back out.
   const initialDealCompletedRef = useRef(false)
   const [slackMessages, setSlackMessages] = useState<PostedSlackMessage[]>([])
-  const [activeSlackChannel, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
+  const [, setActiveSlackChannel] = useState<string>(CHANNEL_ORDER[0])
   const slackMessageCounter = useRef(0)
   // Keys (see allSlackItems) of every message/conversation already posted this game,
   // so none of them repeat for the rest of the session.
@@ -535,6 +536,27 @@ function GameBoard() {
   // turn it was played. A 'character'-action card counts as recurring too (see
   // playerIsRecurring/managerIsRecurring below).
   const activeRecurringEffects = useRef<RecurringEffect[]>([])
+  // Render-facing copy of the still-standing effects above (refs don't re-render) —
+  // refreshed by snapshotEffects at the end of each round and on restart, for the
+  // status panel's "active effects" list.
+  const [activeEffects, setActiveEffects] = useState<ActiveEffect[]>([])
+  const snapshotEffects = () =>
+    setActiveEffects(
+      activeRecurringEffects.current
+        .filter((e) => !e.stopped)
+        .map((e) => ({
+          roundId: e.roundId,
+          side: e.side,
+          title: e.title,
+          character: e.character,
+          backlog: e.backlog,
+          techDebt: e.techDebt,
+          burnout: e.burnout,
+          milestones: e.milestones,
+          turnsRemaining: e.turnsRemaining,
+          suspendedTurnsRemaining: e.suspendedTurnsRemaining,
+        })),
+    )
   // Names of characters whose 'character'-action card has resolved on their side —
   // once added, stays forever (nothing currently un-introduces a character). Gates
   // isCardLocked below: any card naming a character can't be played on that side
@@ -1298,6 +1320,7 @@ function GameBoard() {
     playerDrawPile.current = shuffle(sampleHand)
     playerDiscard.current = []
     activeRecurringEffects.current = []
+    snapshotEffects()
     revealedCharacters.current = { player: new Set(), manager: new Set() }
     characterPlays.current = { player: [], manager: [] }
     usedSlackItems.current = new Set()
@@ -2032,6 +2055,7 @@ function GameBoard() {
         activeRecurringEffects.current.push({
           roundId,
           side: 'player',
+          title: activePlayerCard.title,
           category: activePlayerCard.category,
           character: activePlayerCard.character,
           backlog: activePlayerCard.backlog,
@@ -2046,6 +2070,7 @@ function GameBoard() {
         activeRecurringEffects.current.push({
           roundId,
           side: 'manager',
+          title: activeManagerCard.title,
           category: activeManagerCard.category,
           character: activeManagerCard.character,
           backlog: activeManagerCard.backlog,
@@ -2134,6 +2159,7 @@ function GameBoard() {
           if (e.turnsRemaining === 0) e.stopped = true
         }
       })
+      snapshotEffects()
 
       setActivePlayerCard(null)
       setActiveManagerCard(null)
@@ -2361,29 +2387,6 @@ function GameBoard() {
           </div>
         </div>
 
-        <div className="hud">
-          <div className="hud-panel">
-            <Meters
-              backlog={backlog}
-              techDebt={techDebt}
-              burnout={burnout}
-              vesting={vesting}
-              milestonePoints={milestonePoints}
-              backlogFlashKey={backlogFlashKey}
-              techDebtFlashKey={techDebtFlashKey}
-              burnoutFlashKey={burnoutFlashKey}
-              vestingFlashKey={vestingFlashKey}
-              milestoneFlashKey={milestoneFlashKey}
-              milestoneCheckpointIndex={milestoneCheckpointIndex}
-              milestoneCheckpointKey={milestoneCheckpointKey}
-              backlogMaxed={backlogMaxed}
-              techDebtMaxed={techDebtMaxed}
-              burnoutMaxed={burnoutMaxed}
-              vestingMaxed={vestingMaxed}
-              milestonesWon={milestonesWon}
-            />
-          </div>
-        </div>
       </div>
 
       <div className="row-middle" style={rowHeights ? { height: rowHeights[1] } : undefined}>
@@ -2398,12 +2401,29 @@ function GameBoard() {
           blurredTurns={blurTurnsRemaining}
           storyPointsAvailable={storyPointsAvailable}
         />
-        <SlackPanel
-          channels={CHANNEL_ORDER}
-          activeChannel={activeSlackChannel}
-          onSelectChannel={setActiveSlackChannel}
-          messages={slackMessages}
-          compact={visibleHandCards < HAND_SIZE}
+        <StatusPanel
+          meters={{
+            backlog,
+            techDebt,
+            burnout,
+            vesting,
+            milestonePoints,
+            backlogFlashKey,
+            techDebtFlashKey,
+            burnoutFlashKey,
+            vestingFlashKey,
+            milestoneFlashKey,
+            milestoneCheckpointIndex,
+            milestoneCheckpointKey,
+            backlogMaxed,
+            techDebtMaxed,
+            burnoutMaxed,
+            vestingMaxed,
+            milestonesWon,
+          }}
+          effects={activeEffects}
+          blurTurnsRemaining={blurTurnsRemaining}
+          lastMessage={slackMessages[slackMessages.length - 1]}
         />
       </div>
 

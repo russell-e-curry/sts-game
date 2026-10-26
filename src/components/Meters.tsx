@@ -1,6 +1,6 @@
 import './Meters.css'
 
-interface MetersProps {
+export interface MetersProps {
   backlog: number
   techDebt: number
   burnout: number
@@ -112,6 +112,7 @@ function Meters({
     <div className="meters-wrap">
       <div className="meters">
         <div className="meters-column">
+          <div className="meters-group-label meters-group-label-lose">Lose if maxed</div>
           <div className="meter-bar">
             <div className="meter-bar-top">
               <span className="meter-bar-label">Backlog</span>
@@ -141,9 +142,7 @@ function Meters({
               <span className="meter-bar-remaining">{techDebtUsed} of {STAT_MAX}</span>
             </div>
           </div>
-        </div>
 
-        <div className="meters-column">
           <div className="meter-bar">
             <div className="meter-bar-top">
               <span className="meter-bar-label">Burnout</span>
@@ -158,7 +157,10 @@ function Meters({
               <span className="meter-bar-remaining">{burnoutUsed} of {BURNOUT_MAX}</span>
             </div>
           </div>
+        </div>
 
+        <div className="meters-column">
+          <div className="meters-group-label meters-group-label-win">Win by either</div>
           <div className="meter-bar">
             <div className="meter-bar-top">
               <span className="meter-bar-label">Vesting</span>
@@ -173,30 +175,30 @@ function Meters({
               <span className="meter-bar-remaining">{vestingUsed} of {VESTING_MAX}</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="meter-bar meter-bar-milestones">
-        <span className="meter-bar-label">Milestones</span>
-        <div className="milestone-track">
-          {segments.map((seg, i) => (
-            <div
-              key={i}
-              className={`milestone-segment${seg.complete ? ' milestone-segment-complete' : ''}${
-                i === activeIndex && !seg.complete && seg.pct >= CRITICAL_THRESHOLD
-                  ? ' milestone-segment-celebrate'
-                  : ''
-              }${milestonesWon ? ' milestone-segment-maxed' : ''}`}
-            >
-              <div className="milestone-segment-fill" style={{ width: `${seg.pct}%` }} />
-              {i === activeIndex && !!milestoneFlashKey && (
-                <div key={milestoneFlashKey} className="milestone-segment-flash" />
-              )}
-              {milestoneCheckpointIndex === i && !!milestoneCheckpointKey && (
-                <div key={milestoneCheckpointKey} className="milestone-segment-checkpoint-flash" />
-              )}
+          <div className="meter-bar meter-bar-milestones">
+            <span className="meter-bar-label">Milestones</span>
+            <div className="milestone-track">
+              {segments.map((seg, i) => (
+                <div
+                  key={i}
+                  className={`milestone-segment${seg.complete ? ' milestone-segment-complete' : ''}${
+                    i === activeIndex && !seg.complete && seg.pct >= CRITICAL_THRESHOLD
+                      ? ' milestone-segment-celebrate'
+                      : ''
+                  }${milestonesWon ? ' milestone-segment-maxed' : ''}`}
+                >
+                  <div className="milestone-segment-fill" style={{ width: `${seg.pct}%` }} />
+                  {i === activeIndex && !!milestoneFlashKey && (
+                    <div key={milestoneFlashKey} className="milestone-segment-flash" />
+                  )}
+                  {milestoneCheckpointIndex === i && !!milestoneCheckpointKey && (
+                    <div key={milestoneCheckpointKey} className="milestone-segment-checkpoint-flash" />
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>
